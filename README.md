@@ -364,36 +364,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 👨‍💻 Author
-
-**Your Name**
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Email: your.email@example.com
-
----
-
-## 🙏 Acknowledgments
-
-- University data includes top-ranked institutions from QS World Rankings
-- Icons by [Font Awesome](https://fontawesome.com/)
-- UI inspiration from modern web design trends
-- Algorithm inspired by recommendation systems research
-
----
-
-## 📞 Support
-
-If you have any questions or need help, please:
-- Open an issue on GitHub
-- Email: support@example.com
-
----
-
-<div align="center">
-
-**⭐ Star this repo if you find it helpful!**
-
-Made with ❤️ for students worldwide
-
-</div>
 
