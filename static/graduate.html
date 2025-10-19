@@ -92,7 +92,10 @@
         font-size: 2.2rem;
         font-weight: 700;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+<<<<<<< HEAD
         background-clip: text;
+=======
+>>>>>>> origin/main
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 15px;
@@ -294,7 +297,11 @@
           <h2><i class="fas fa-clipboard-list"></i> Enter Your Academic Details</h2>
           <p class="subtitle">Provide comprehensive information to get the most accurate university recommendations</p>
           
+<<<<<<< HEAD
           <form action="/graduatealgo" id="recommendationForm" method="POST">
+=======
+          <form action="/graduatealgo" id="recommendationForm">
+>>>>>>> origin/main
             
             <!-- Academic Scores Section -->
             <h3 style="color: #667eea; margin-bottom: 20px; font-size: 1.3rem;">
@@ -503,6 +510,7 @@
             </h3>
             
             <div class="form-group">
+<<<<<<< HEAD
               <label for="countrySelect">
                 <i class="fas fa-globe"></i>
                 Preferred Study Countries (Multi-Select)
@@ -520,6 +528,24 @@
               <small class="form-text text-muted">
                 Hold Ctrl (Windows) or Cmd (Mac) to select multiple countries.
               </small>
+=======
+              <label for="country">
+                <i class="fas fa-globe"></i>
+                Preferred Study Country
+              </label>
+              <select class="form-control" id="country" name="country" required>
+                <option value="">Select Country</option>
+                <option value="USA">United States</option>
+                <option value="UK">United Kingdom</option>
+                <option value="Canada">Canada</option>
+                <option value="Australia">Australia</option>
+                <option value="Germany">Germany</option>
+                <option value="Netherlands">Netherlands</option>
+                <option value="Singapore">Singapore</option>
+                <option value="Switzerland">Switzerland</option>
+                <option value="Any">Any Country</option>
+              </select>
+>>>>>>> origin/main
             </div>
             
             <div class="form-group">
@@ -640,6 +666,7 @@
     <script>
       // Form submission handler
       document.getElementById('recommendationForm').addEventListener('submit', function(e) {
+<<<<<<< HEAD
         // Ensure loader visible
         document.getElementById('loader').classList.add('active');
         // Collect multi-selected countries (for completeness if needed elsewhere)
@@ -651,6 +678,9 @@
           Array.from(select.options).forEach(o => { o.selected = (o.value === 'Any Country'); });
         }
         // No need to modify form data explicitly; multiple select will submit repeated preferred_countries params.
+=======
+        document.getElementById('loader').classList.add('active');
+>>>>>>> origin/main
       });
       
       // Language test selection handler
