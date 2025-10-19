@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Enter Your Details - Graduate University Finder</title>
+    
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+      /* Updated: 2025-10-18 20:57 - Dropdown visibility fix */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Poppins', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 40px 20px;
+      }
+      
+      .navbar {
+        background: rgba(0, 0, 0, 0.8) !important;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        border-radius: 15px;
+        padding: 15px 20px;
+        margin-bottom: 30px;
+      }
+      
+      .navbar-brand {
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: #fff !important;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      
+      .navbar-brand i {
+        color: #ffd700;
+      }
+      
+      .nav-link {
+        color: #fff !important;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        padding: 8px 15px;
+        border-radius: 8px;
+        margin: 0 5px;
+      }
+      
+      .nav-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+      }
+      
+      .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+      
+      .form-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 25px;
+        padding: 50px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: fadeInUp 0.8s ease;
+        max-width: 700px;
+        margin: 20px auto;
+      }
+      
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      .form-container h2 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+      
+      .form-container .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 40px;
+        font-size: 1.1rem;
+      }
+      
+      .form-group {
+        margin-bottom: 25px;
+      }
+      
+      .form-group label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .form-group label i {
+        color: #667eea;
+      }
+      
+      .form-control {
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 12px 15px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background-color: #ffffff !important;
+        color: #333333 !important;
+        min-height: 48px;
+        line-height: 1.5;
+      }
+      
+      .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        outline: none;
+        background-color: #ffffff !important;
+        color: #333333 !important;
+      }
+      
+      .form-control option {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+        padding: 10px;
+        font-size: 1rem;
+      }
+      
+      select.form-control {
+        appearance: menulist !important;
+        -webkit-appearance: menulist !important;
+        -moz-appearance: menulist !important;
+        cursor: pointer;
+        font-weight: 500;
+        color: #333333 !important;
+        background-color: #ffffff !important;
+        height: 48px !important;
+        min-height: 48px !important;
+        line-height: 1.5 !important;
+        padding: 12px 15px !important;
+        display: flex !important;
+        align-items: center !important;
+      }
+      
+      select.form-control option:checked {
+        background-color: #667eea !important;
+        color: white !important;
+      }
+      
+      input.form-control {
+        background-color: #ffffff !important;
+        color: #333333 !important;
+      }
+      
+      input.form-control::placeholder {
+        color: #999999 !important;
+        opacity: 1;
+      }
+      
+      .input-info {
+        font-size: 0.85rem;
+        color: #888;
+        margin-top: 5px;
+      }
+      
+      .submit-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        font-size: 1.2rem;
+        font-weight: 600;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        width: 100%;
+        margin-top: 20px;
+      }
+      
+      .submit-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+      }
+      
+      .submit-button i {
+        margin-left: 10px;
+      }
+      
+      .score-ranges {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 12px;
+        margin-top: 30px;
+        border-left: 4px solid #667eea;
+      }
+      
+      .score-ranges h4 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      
+      .score-ranges ul {
+        margin: 0;
+        padding-left: 20px;
+        color: #666;
+        font-size: 0.9rem;
+      }
+      
+      .loader {
+        display: none;
+        text-align: center;
+        margin-top: 20px;
+      }
+      
+      .loader.active {
+        display: block;
+      }
+      
+      .loader i {
+        font-size: 2rem;
+        color: #667eea;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      @media (max-width: 768px) {
+        .form-container {
+          padding: 30px 20px;
+        }
+        
+        .form-container h2 {
+          font-size: 1.8rem;
+        }
+      }
+    </style>
+</head>
+  <body>
+
+    <div class="container">
+      <nav class="navbar navbar-expand-md navbar-dark">
+          <h3 class="navbar-brand">
+            <i class="fas fa-graduation-cap"></i>
+            Graduate University Finder
+          </h3>
+          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExample05" aria-controls="navbarsExample05" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarsExample05">
+              <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                  <a class="nav-link" href="/main"><i class="fas fa-home"></i> Home</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link active" href="/graduate"><i class="fas fa-search"></i> Find Universities</a>
+                </li>
+              </ul>
+          </div>
+      </nav>
+    </div>
+
+    <div class="container">
+      <div class="form-container">
+          <h2><i class="fas fa-clipboard-list"></i> Enter Your Academic Details</h2>
+          <p class="subtitle">Provide comprehensive information to get the most accurate university recommendations</p>
+          
+          <form action="/graduatealgo" id="recommendationForm" method="POST">
+            
+            <!-- Academic Scores Section -->
+            <h3 style="color: #667eea; margin-bottom: 20px; font-size: 1.3rem;">
+              <i class="fas fa-graduation-cap"></i> Academic Scores
+            </h3>
+            
+            <div class="form-group">
+              <label for="greV">
+                <i class="fas fa-pen"></i>
+                GRE Verbal Reasoning Score
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="greV"
+                name="greV" 
+                placeholder="Enter score (130-170)"
+                min="130"
+                max="170"
+                required
+              >
+              <small class="input-info">Score range: 130 - 170</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="greQ">
+                <i class="fas fa-calculator"></i>
+                GRE Quantitative Reasoning Score
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="greQ"
+                name="greQ" 
+                placeholder="Enter score (130-170)"
+                min="130"
+                max="170"
+                required
+              >
+              <small class="input-info">Score range: 130 - 170</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="greA">
+                <i class="fas fa-pen-fancy"></i>
+                GRE Analytical Writing Score
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="greA"
+                name="greA" 
+                placeholder="Enter score (0-6)"
+                min="0"
+                max="6"
+                step="0.5"
+                required
+              >
+              <small class="input-info">Score range: 0.0 - 6.0 (in increments of 0.5)</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="cgpa">
+                <i class="fas fa-award"></i>
+                Cumulative GPA (Undergraduate)
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="cgpa"
+                name="cgpa" 
+                placeholder="Enter GPA (0-4)"
+                min="0"
+                max="4"
+                step="0.01"
+                required
+              >
+              <small class="input-info">GPA on a 4.0 scale</small>
+            </div>
+
+            <!-- Language Proficiency Section -->
+            <h3 style="color: #667eea; margin: 30px 0 20px 0; font-size: 1.3rem;">
+              <i class="fas fa-language"></i> Language Proficiency
+            </h3>
+            
+            <div class="form-group">
+              <label>
+                <i class="fas fa-comments"></i>
+                English Proficiency Test
+              </label>
+              <select class="form-control" id="englishTest" name="englishTest" required>
+                <option value="">Select Test Type</option>
+                <option value="IELTS">IELTS</option>
+                <option value="TOEFL">TOEFL</option>
+                <option value="None">Not Taken Yet</option>
+              </select>
+            </div>
+            
+            <div class="form-group" id="ieltsGroup" style="display:none;">
+              <label for="ielts">
+                <i class="fas fa-star"></i>
+                IELTS Score
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="ielts"
+                name="ielts" 
+                placeholder="Enter score (0-9)"
+                min="0"
+                max="9"
+                step="0.5"
+              >
+              <small class="input-info">Score range: 0.0 - 9.0</small>
+            </div>
+            
+            <div class="form-group" id="toeflGroup" style="display:none;">
+              <label for="toefl">
+                <i class="fas fa-star"></i>
+                TOEFL Score
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="toefl"
+                name="toefl" 
+                placeholder="Enter score (0-120)"
+                min="0"
+                max="120"
+              >
+              <small class="input-info">Score range: 0 - 120</small>
+            </div>
+
+            <!-- Academic Background Section -->
+            <h3 style="color: #667eea; margin: 30px 0 20px 0; font-size: 1.3rem;">
+              <i class="fas fa-user-graduate"></i> Academic Background
+            </h3>
+            
+            <div class="form-group">
+              <label for="major">
+                <i class="fas fa-book"></i>
+                Intended Field of Study
+              </label>
+              <select class="form-control" id="major" name="major" required>
+                <option value="">Select Field</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Data Science">Data Science</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Business">Business/MBA</option>
+                <option value="Electrical Engineering">Electrical Engineering</option>
+                <option value="Mechanical Engineering">Mechanical Engineering</option>
+                <option value="Civil Engineering">Civil Engineering</option>
+                <option value="Biotechnology">Biotechnology</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <!-- Professional Experience Section -->
+            <h3 style="color: #667eea; margin: 30px 0 20px 0; font-size: 1.3rem;">
+              <i class="fas fa-briefcase"></i> Professional Experience
+            </h3>
+            
+            <div class="form-group">
+              <label for="workExperience">
+                <i class="fas fa-business-time"></i>
+                Years of Work Experience
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="workExperience"
+                name="workExperience" 
+                placeholder="Enter years (0-20)"
+                min="0"
+                max="20"
+                step="0.5"
+                value="0"
+              >
+              <small class="input-info">Professional work experience in years</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="publications">
+                <i class="fas fa-file-alt"></i>
+                Research Publications
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="publications"
+                name="publications" 
+                placeholder="Number of publications (0-20)"
+                min="0"
+                max="20"
+                value="0"
+              >
+              <small class="input-info">Academic papers or conference publications</small>
+            </div>
+
+            <!-- Preferences Section -->
+            <h3 style="color: #667eea; margin: 30px 0 20px 0; font-size: 1.3rem;">
+              <i class="fas fa-sliders-h"></i> Your Preferences
+            </h3>
+            
+            <div class="form-group">
+              <label for="countrySelect">
+                <i class="fas fa-globe"></i>
+                Preferred Study Countries (Multi-Select)
+              </label>
+              <select id="countrySelect" name="preferred_countries" multiple class="form-control">
+                <option value="Australia">Australia</option>
+                <option value="UK">United Kingdom</option>
+                <option value="Canada">Canada</option>
+                <option value="USA">United States</option>
+                <option value="Germany">Germany</option>
+                <option value="Netherlands">Netherlands</option>
+                <option value="Sweden">Sweden</option>
+                <option value="Any Country">Any Country</option>
+              </select>
+              <small class="form-text text-muted">
+                Hold Ctrl (Windows) or Cmd (Mac) to select multiple countries.
+              </small>
+            </div>
+            
+            <div class="form-group">
+              <label for="budgetMin">
+                <i class="fas fa-dollar-sign"></i>
+                Budget Range (USD per year)
+              </label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input 
+                  type="number" 
+                  class="form-control" 
+                  id="budgetMin"
+                  name="budgetMin" 
+                  placeholder="Min (e.g., 1500)"
+                  min="0"
+                  max="100000"
+                  step="1000"
+                  value="1500"
+                >
+                <input 
+                  type="number" 
+                  class="form-control" 
+                  id="budgetMax"
+                  name="budgetMax" 
+                  placeholder="Max (e.g., 60000)"
+                  min="0"
+                  max="100000"
+                  step="1000"
+                  value="60000"
+                >
+              </div>
+              <small class="input-info">Annual tuition budget in USD</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="universityType">
+                <i class="fas fa-university"></i>
+                University Type
+              </label>
+              <select class="form-control" id="universityType" name="universityType">
+                <option value="Any">Any</option>
+                <option value="Public">Public</option>
+                <option value="Private">Private</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="rankingMax">
+                <i class="fas fa-trophy"></i>
+                Maximum World Ranking
+              </label>
+              <select class="form-control" id="rankingMax" name="rankingMax">
+                <option value="1000">Any Ranking</option>
+                <option value="50">Top 50</option>
+                <option value="100">Top 100</option>
+                <option value="200">Top 200</option>
+                <option value="500">Top 500</option>
+              </select>
+              <small class="input-info">Based on QS World Rankings</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="duration">
+                <i class="fas fa-clock"></i>
+                Program Duration Preference
+              </label>
+              <select class="form-control" id="duration" name="duration">
+                <option value="2">Any Duration</option>
+                <option value="1">1 Year Programs</option>
+                <option value="2">2 Year Programs</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>
+                <i class="fas fa-check-circle"></i>
+                Additional Preferences
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                  <input type="checkbox" name="researchFocus" id="researchFocus" value="true">
+                  <span>Research-Focused Programs</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                  <input type="checkbox" name="internshipOpportunities" id="internshipOpportunities" value="true" checked>
+                  <span>Good Internship Opportunities</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                  <input type="checkbox" name="workVisa" id="workVisa" value="true" checked>
+                  <span>Post-Study Work Visa Available</span>
+                </label>
+              </div>
+            </div>
+            
+            <button type="submit" class="submit-button">
+              Get Recommendations <i class="fas fa-arrow-right"></i>
+            </button>
+            
+            <div class="loader" id="loader">
+              <i class="fas fa-spinner"></i>
+              <p>Analyzing your profile and finding the best matches...</p>
+            </div>
+          </form>
+          
+          <div class="score-ranges">
+            <h4><i class="fas fa-info-circle"></i> Score Information</h4>
+            <ul>
+              <li><strong>GRE Verbal & Quantitative:</strong> Each section scored 130-170</li>
+              <li><strong>GRE Analytical Writing:</strong> Scored 0.0-6.0 in half-point increments</li>
+              <li><strong>GPA:</strong> Should be on a 4.0 scale</li>
+            </ul>
+          </div>
+      </div>
+    </div>
+    
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js"></script>
+    <script>
+      // Form submission handler
+      document.getElementById('recommendationForm').addEventListener('submit', function(e) {
+        // Ensure loader visible
+        document.getElementById('loader').classList.add('active');
+        // Collect multi-selected countries (for completeness if needed elsewhere)
+        const selectedCountries = Array.from(document.querySelectorAll('#countrySelect option:checked')).map(opt => opt.value);
+        // If "Any Country" is chosen along with others, reduce to just Any Country to avoid contradictions
+        if (selectedCountries.includes('Any Country') && selectedCountries.length > 1) {
+          // Deselect all others and keep Any Country
+          const select = document.getElementById('countrySelect');
+          Array.from(select.options).forEach(o => { o.selected = (o.value === 'Any Country'); });
+        }
+        // No need to modify form data explicitly; multiple select will submit repeated preferred_countries params.
+      });
+      
+      // Language test selection handler
+      document.getElementById('englishTest').addEventListener('change', function() {
+        const ieltsGroup = document.getElementById('ieltsGroup');
+        const toeflGroup = document.getElementById('toeflGroup');
+        const ieltsInput = document.getElementById('ielts');
+        const toeflInput = document.getElementById('toefl');
+        
+        // Hide both initially
+        ieltsGroup.style.display = 'none';
+        toeflGroup.style.display = 'none';
+        ieltsInput.removeAttribute('required');
+        toeflInput.removeAttribute('required');
+        
+        // Show relevant test
+        if (this.value === 'IELTS') {
+          ieltsGroup.style.display = 'block';
+          ieltsInput.setAttribute('required', 'required');
+        } else if (this.value === 'TOEFL') {
+          toeflGroup.style.display = 'block';
+          toeflInput.setAttribute('required', 'required');
+        }
+      });
+      
+      // Budget validation
+      document.getElementById('budgetMax').addEventListener('change', function() {
+        const minBudget = parseInt(document.getElementById('budgetMin').value) || 0;
+        const maxBudget = parseInt(this.value) || 0;
+        
+        if (maxBudget > 0 && minBudget > 0 && maxBudget < minBudget) {
+          alert('Maximum budget must be greater than minimum budget');
+          this.value = minBudget + 10000;
+        }
+      });
+    </script>
+  </body>
+</html>
