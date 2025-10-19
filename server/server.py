@@ -1,9 +1,5 @@
 import random
-<<<<<<< HEAD
 from flask import Flask, render_template, request, redirect, jsonify
-=======
-from flask import Flask, render_template, request, redirect
->>>>>>> origin/main
 from markupsafe import escape
 import pandas as pd
 import numpy as np
@@ -17,8 +13,8 @@ app = Flask(__name__, static_folder='../static/dist', template_folder='../static
 # Load and prepare enhanced data once at startup for better performance
 print("Loading and preparing real university data...")
 import os
-<<<<<<< HEAD
 from typing import Dict, Any, List
+import io
 try:
     # When running as a module, relative import works
     from .utils.calculate_weighted_score import (
@@ -46,11 +42,42 @@ else:
     # Provide a helpful error message listing both attempted paths
     raise FileNotFoundError(f"Real_University_Data.csv not found. Tried: {primary_csv} and {fallback_csv}")
 
-=======
-csv_path = os.path.join(os.path.dirname(__file__), '..', 'WebScraped_data', 'csv', 'Real_University_Data.csv')
->>>>>>> origin/main
-data = pd.read_csv(csv_path)
-data.drop(data.columns[data.columns.str.contains('unnamed',case = False)],axis = 1, inplace = True)
+def _load_clean_university_csv(path: str) -> pd.DataFrame:
+    """Load CSV while removing git merge markers and duplicate header rows."""
+    markers = ('<<<<<<<', '=======', '>>>>>>>')
+    header_line = None
+    cleaned_lines: List[str] = []
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        for raw in f:
+            line = raw.strip('\n')
+            # Skip merge marker lines entirely
+            if any(line.startswith(m) for m in markers):
+                continue
+            # Capture the first valid header (contains key columns)
+            if header_line is None:
+                if (
+                    'greV' in line and 'greQ' in line and 'greA' in line and
+                    'cgpa' in line and 'univName' in line and 'country' in line
+                ):
+                    header_line = line
+                    cleaned_lines.append(line + '\n')
+                # else keep scanning until we find the header
+            else:
+                # Skip repeated header occurrences inside the file
+                if line == header_line:
+                    continue
+                cleaned_lines.append(line + '\n')
+    if not cleaned_lines:
+        raise ValueError(f"Failed to parse CSV at {path}: no valid data found")
+    buf = io.StringIO(''.join(cleaned_lines))
+    df = pd.read_csv(buf)
+    # Drop unnamed index columns and duplicates
+    df.drop(df.columns[df.columns.str.contains('unnamed', case=False)], axis=1, inplace=True, errors='ignore')
+    df.drop_duplicates(inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+data = _load_clean_university_csv(csv_path)
 
 print(f"Loaded {len(data)} universities with columns: {list(data.columns)}")
 
@@ -438,13 +465,8 @@ def optimized_knn(greV, greQ, greA, cgpa, user_prefs={}, k=7):
     return sortedNeighbors, neighbors_list, filtered_trainSet
 
 
-
-
-
 # Undergraduate functionality removed - focusing only on graduate recommendations
 
-  
-<<<<<<< HEAD
 @app.route('/graduatealgo', methods=['GET', 'POST'])
 def graduatealgo():
     try:
@@ -481,41 +503,6 @@ def graduatealgo():
         researchFocus = src_args.get("researchFocus") == "true"
         internshipOpportunities = src_args.get("internshipOpportunities") == "true"
         workVisa = src_args.get("workVisa") == "true"
-=======
-@app.route('/graduatealgo')
-def graduatealgo():
-    try:
-        # Get basic academic scores
-        greV = float(request.args.get("greV"))
-        greQ = float(request.args.get("greQ"))
-        greA = float(request.args.get("greA")) 
-        cgpa = float(request.args.get("cgpa"))
-        
-        # Get language proficiency
-        englishTest = request.args.get("englishTest", "None")
-        ielts = float(request.args.get("ielts", 0)) if request.args.get("ielts") else None
-        toefl = float(request.args.get("toefl", 0)) if request.args.get("toefl") else None
-        
-        # Get academic background
-        major = request.args.get("major", "")
-        
-        # Get professional experience
-        workExperience = float(request.args.get("workExperience", 0))
-        publications = int(request.args.get("publications", 0))
-        
-        # Get preferences
-        country = request.args.get("country", "Any")
-        budgetMin = float(request.args.get("budgetMin", 0))
-        budgetMax = float(request.args.get("budgetMax", 100000))
-        universityType = request.args.get("universityType", "Any")
-        rankingMax = int(request.args.get("rankingMax", 1000))
-        duration = int(request.args.get("duration", 2))
-        
-        # Get boolean preferences
-        researchFocus = request.args.get("researchFocus") == "true"
-        internshipOpportunities = request.args.get("internshipOpportunities") == "true"
-        workVisa = request.args.get("workVisa") == "true"
->>>>>>> origin/main
         
         print(f"Processing comprehensive request:")
         print(f"  Academic: GRE V:{greV}, Q:{greQ}, A:{greA}, GPA:{cgpa}")
@@ -546,8 +533,6 @@ def graduatealgo():
             user_prefs['ielts'] = ielts
         if toefl:
             user_prefs['toefl'] = toefl
-<<<<<<< HEAD
-
         # Parse preferred_countries (multi-select support) from query params
         if request.method == 'POST':
             raw_pref = request.form.getlist('preferred_countries') or request.form.get('preferred_countries')
@@ -592,7 +577,7 @@ def graduatealgo():
         # Optional: infer Management focus from major keywords
         if not intent_prefs['focus'] and major and any(k in major.lower() for k in ['business','management','mba']):
             intent_prefs['focus'] = 'Management'
-
+        
         # Apply intent filters and dynamic scoring
         filtered_data, info = intent_filter(data, intent_prefs)
         ranked = score_and_rank(filtered_data, intent_prefs)
@@ -617,29 +602,6 @@ def graduatealgo():
                 continue
             uni_info = row_match.iloc[0]
             uni_details.append({
-=======
-        
-        # Use optimized KNN algorithm with filtering
-        result, neigh, filtered_data = optimized_knn(greV, greQ, greA, cgpa, user_prefs, k=7)
-        
-        list1 = []
-        list2 = []
-        is_fallback_list = []
-        for i in result:
-            list1.append(i[0])
-            list2.append(i[1])
-            is_fallback_list.append(i[2] if len(i) > 2 else False)
-        
-        # Count how many are perfect matches vs fallback
-        perfect_matches = sum(1 for fb in is_fallback_list if not fb)
-        fallback_matches = sum(1 for fb in is_fallback_list if fb)
-        
-        # Get university details for display
-        uni_details = []
-        for idx, uni_name in enumerate(list1[:5]):
-            uni_info = filtered_data[filtered_data['univName'] == uni_name].iloc[0]
-            details = {
->>>>>>> origin/main
                 'name': uni_name,
                 'country': uni_info.get('country', 'N/A'),
                 'ranking': int(uni_info['ranking']) if not pd.isna(uni_info.get('ranking')) else 'N/A',
@@ -648,7 +610,6 @@ def graduatealgo():
                 'duration': f"{int(uni_info['duration_years'])} year{'s' if uni_info['duration_years'] > 1 else ''}" if not pd.isna(uni_info.get('duration_years')) else 'N/A',
                 'ielts': uni_info['ielts_min'] if not pd.isna(uni_info.get('ielts_min')) else 'N/A',
                 'toefl': uni_info['toefl_min'] if not pd.isna(uni_info.get('toefl_min')) else 'N/A',
-<<<<<<< HEAD
                 'is_fallback': False  # Not tracked per-row; show relaxations note instead
             })
 
@@ -673,17 +634,6 @@ def graduatealgo():
                                 </p>
                             </div>
             '''
-
-=======
-                'is_fallback': is_fallback_list[idx] if idx < len(is_fallback_list) else False
-            }
-            uni_details.append(details)
-        
-        for detail in uni_details:
-            if detail:
-                print(f"Recommended: {detail['name']} ({detail['country']}) - Rank: {detail['ranking']}")
-        
->>>>>>> origin/main
         return f'''
             <!DOCTYPE html>
             <html lang="en">
@@ -1223,24 +1173,10 @@ def graduatealgo():
                                 <i class="fas fa-star"></i> {'Perfect Matches for All Your Criteria!' if perfect_matches == 5 else f'Your University Recommendations ({perfect_matches} Perfect Match{"es" if perfect_matches != 1 else ""})'}
                             </h3>
                             
-<<<<<<< HEAD
                             {note_html}
 
                             <div class="recommendations-list">
                                 '''+ ''.join([f'''
-=======
-                            {f'''<div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 20px; border-radius: 15px; margin-bottom: 30px; border-left: 5px solid #f39c12; box-shadow: 0 5px 15px rgba(243, 156, 18, 0.2);">
-                                <p style="margin: 0; color: #856404; font-size: 1.05rem; line-height: 1.6;">
-                                    <i class="fas fa-info-circle" style="color: #f39c12; margin-right: 8px;"></i>
-                                    <strong>Note:</strong> We found only <strong>{perfect_matches}</strong> universit{"y" if perfect_matches == 1 else "ies"} matching all your criteria. 
-                                    The remaining <strong>{fallback_matches}</strong> recommendation{"s are" if fallback_matches > 1 else " is"} based on your <strong>GRE scores and budget</strong>, 
-                                    which may be great alternatives!
-                                </p>
-                            </div>''' if fallback_matches > 0 else ''}
-                            
-                            <div class="recommendations-list">
-                                ''' + ''.join([f'''
->>>>>>> origin/main
                                 <div class="recommendation-card{' fallback-card' if detail.get('is_fallback') else ''}">
                                     <div class="rank">{i+1}</div>
                                     {f'<div class="fallback-badge"><i class="fas fa-lightbulb"></i> Alternative Match</div>' if detail.get('is_fallback') else ''}
@@ -1330,7 +1266,6 @@ def graduatealgo():
             </html>
         '''
 
-<<<<<<< HEAD
     
     # ================= Intent-driven API & helpers =================
 def intent_filter(df: pd.DataFrame, user_prefs: Dict[str, Any]):
@@ -1533,8 +1468,6 @@ def api_recommend():
         },
         'top5': top5,
     })
-=======
->>>>>>> origin/main
 
 
 if __name__ == '__main__':
