@@ -5,9 +5,7 @@ import pandas as pd
 import numpy as np
 import csv
 import math
-from sklearn import neighbors, datasets
 from numpy.random import permutation
-from sklearn.metrics import precision_recall_fscore_support
 app = Flask(__name__, static_folder='../static', template_folder='../static')
 
 # Load and prepare enhanced data once at startup for better performance
@@ -308,10 +306,20 @@ def get_best_universities(user_data, top_n=15):
         ]
         print(f"\nAfter field filter ({user_data['major']}): {len(filtered_data)} universities")
     
-    # Step 2: Filter by country
+    # Step 2: Filter by country (support multiple countries)
     if user_data.get('country') and user_data['country'] != 'Any':
-        filtered_data = filtered_data[filtered_data['country'] == user_data['country']]
-        print(f"After country filter ({user_data['country']}): {len(filtered_data)} universities")
+        # Check if country is a string or list
+        country_filter = user_data['country']
+        if isinstance(country_filter, str):
+            filtered_data = filtered_data[filtered_data['country'] == country_filter]
+            print(f"After country filter ({country_filter}): {len(filtered_data)} universities")
+        elif isinstance(country_filter, list) and len(country_filter) > 0:
+            filtered_data = filtered_data[filtered_data['country'].isin(country_filter)]
+            print(f"After country filter ({', '.join(country_filter)}): {len(filtered_data)} universities")
+    elif user_data.get('preferred_countries') and len(user_data['preferred_countries']) > 0:
+        # Handle case where preferred_countries is passed separately
+        filtered_data = filtered_data[filtered_data['country'].isin(user_data['preferred_countries'])]
+        print(f"After country filter ({', '.join(user_data['preferred_countries'])}): {len(filtered_data)} universities")
     
     # Step 3: Filter by budget
     if user_data.get('budgetMin') and user_data.get('budgetMax'):
@@ -331,12 +339,15 @@ def get_best_universities(user_data, top_n=15):
         print(f"After type filter ({user_data['universityType']}): {len(filtered_data)} universities")
     
     # Step 6: Filter by duration
-    if user_data.get('duration') and user_data['duration'] < 2:
+    duration_value = user_data.get('duration', 0)
+    if duration_value and duration_value > 0:
+        # Only filter if user specifically selected 1-year or 2-year programs
+        # Value of 0 means "Any Duration" (no filter applied)
         filtered_data = filtered_data[
-            (filtered_data['duration_years'] == user_data['duration']) |
+            (filtered_data['duration_years'] == duration_value) |
             filtered_data['duration_years'].isna()
         ]
-        print(f"After duration filter ({user_data['duration']} year): {len(filtered_data)} universities")
+        print(f"After duration filter ({duration_value} year): {len(filtered_data)} universities")
     
     # Step 7: Calculate comprehensive scores for all filtered universities
     print(f"\n=== Calculating Comprehensive Scores ===")
@@ -363,18 +374,20 @@ def get_best_universities(user_data, top_n=15):
     # Get top N unique universities
     seen_universities = set()
     top_universities = []
+    unique_score_details = []
     
     for item in scores_list:
         uni_name = item['uni_name']
         if uni_name not in seen_universities:
             seen_universities.add(uni_name)
             top_universities.append(item['idx'])
+            unique_score_details.append(item)
             if len(top_universities) >= top_n:
                 break
     
     print(f"\nSelected {len(top_universities)} unique universities")
     
-    return top_universities, filtered_data, scores_list[:top_n]
+    return top_universities, filtered_data, unique_score_details
 
 
 @app.route('/graduatealgo', methods=['GET', 'POST'])
@@ -407,7 +420,7 @@ def graduatealgo():
         budgetMin = float(src_args.get("budgetMin", 0))
         budgetMax = float(src_args.get("budgetMax", 100000))
         universityType = src_args.get("universityType", "Any")
-        duration = int(src_args.get("duration", 2))
+        duration = int(src_args.get("duration", 0))  # 0 = Any Duration, 1 = 1-year, 2 = 2-year
         
         # Get boolean preferences
         researchFocus = src_args.get("researchFocus") == "true"
@@ -436,9 +449,11 @@ def graduatealgo():
         
         preferred_countries = [c.strip() for c in preferred_countries if c and c.strip() and c.strip().lower() not in ["any", "any country", "select country"]]
         
-        # If multiple countries selected, use first one for single country filter
+        # Use the full list of preferred countries for filtering
         if preferred_countries:
-            country = preferred_countries[0]
+            country = preferred_countries if len(preferred_countries) > 1 else preferred_countries[0]
+        else:
+            country = "Any"
         
         print(f"\n{'='*60}")
         print(f"Processing Comprehensive Recommendation Request")
@@ -446,8 +461,10 @@ def graduatealgo():
         print(f"Academic: GRE V:{greV}, Q:{greQ}, A:{greA}, GPA:{cgpa}")
         print(f"Language: {englishTest} - IELTS:{ielts}, TOEFL:{toefl}")
         print(f"Background: Major:{major}, Experience:{workExperience}y, Publications:{publications}")
-        print(f"Preferences: Country:{country}, Budget:${budgetMin}-${budgetMax}")
-        print(f"Filters: Type:{universityType}, Duration:{duration}y")
+        country_display = ', '.join(country) if isinstance(country, list) else country
+        print(f"Preferences: Country:{country_display}, Budget:${budgetMin}-${budgetMax}")
+        duration_text = "Any" if duration == 0 else f"{duration}y"
+        print(f"Filters: Type:{universityType}, Duration:{duration_text}")
         print(f"Boolean Prefs: Research:{researchFocus}, Internship:{internshipOpportunities}, Visa:{workVisa}")
         print(f"{'='*60}\n")
         
