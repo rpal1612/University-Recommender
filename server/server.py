@@ -133,7 +133,18 @@ def calculate_comprehensive_score(user_data, uni_row):
     )
     
     # 1. Academic Match (30% weight) - How well user matches university requirements
-    uni_academic_strength = uni_row.get('academic_strength', 0.5)
+    # Calculate university's academic strength from existing data
+    uni_greV_norm = (uni_row.get('greV', 150) - 130) / 40
+    uni_greQ_norm = (uni_row.get('greQ', 150) - 130) / 40
+    uni_greA_norm = uni_row.get('greA', 4.0) / 6.0
+    uni_cgpa_norm = uni_row.get('cgpa', 3.0) / 4.0
+    
+    uni_academic_strength = (
+        uni_greV_norm * 0.25 + 
+        uni_greQ_norm * 0.35 +
+        uni_greA_norm * 0.15 + 
+        uni_cgpa_norm * 0.25
+    )
     
     # Score based on how close user is to university requirements
     if user_academic_strength >= uni_academic_strength:
@@ -149,16 +160,29 @@ def calculate_comprehensive_score(user_data, uni_row):
     details['academic_match'] = round(academic_score * 0.30, 3)
     
     # 2. University Prestige (25% weight) - Ranking + research reputation
-    prestige_score = uni_row.get('ranking_score', 0.3)
+    # Calculate ranking score from actual ranking data
+    ranking = uni_row.get('ranking', 999)
+    if ranking <= 10:
+        prestige_score = 1.0
+    elif ranking <= 50:
+        prestige_score = 0.9
+    elif ranking <= 100:
+        prestige_score = 0.7
+    elif ranking <= 200:
+        prestige_score = 0.5
+    elif ranking <= 500:
+        prestige_score = 0.3
+    else:
+        prestige_score = 0.2
     
     # Small boost for research universities if user has publications (capped at 1.0)
     publications = user_data.get('publications', 0)
-    if publications > 2 and uni_row.get('research_flag', 0) == 1:
+    if publications > 2 and uni_row.get('research_focused', False):
         prestige_score = min(1.0, prestige_score + 0.05)
     
     # Small boost for work experience with professional programs (capped at 1.0)
     work_exp = user_data.get('workExperience', 0)
-    if work_exp > 3 and uni_row.get('internship_flag', 0) == 1:
+    if work_exp > 3 and uni_row.get('internship_opportunities', False):
         prestige_score = min(1.0, prestige_score + 0.05)
     
     score += prestige_score * 0.25
@@ -194,24 +218,26 @@ def calculate_comprehensive_score(user_data, uni_row):
     budget_max = user_data.get('budgetMax', 100000)
     budget_min = user_data.get('budgetMin', 0)
     
-    if uni_fees <= budget_max:
+    if uni_fees <= 0:
+        # No tuition data available
+        affordability_score = 0.5
+    elif uni_fees <= budget_max:
         if uni_fees <= budget_min:
             # Way below budget - possibly too cheap, slight penalty
             affordability_score = 0.8
         else:
-            # Within budget - use affordability feature
-            affordability_score = uni_row.get('affordability', 0.5)
-            # Bonus if close to user's budget sweet spot
+            # Within budget - calculate based on how close to budget range
             budget_mid = (budget_min + budget_max) / 2
-            if abs(uni_fees - budget_mid) / budget_max < 0.2:
-                affordability_score = min(1.0, affordability_score * 1.15)
+            if uni_fees <= budget_mid:
+                # Lower half of budget - very affordable
+                affordability_score = 1.0
+            else:
+                # Upper half of budget - less affordable but still good
+                affordability_score = 0.8 - ((uni_fees - budget_mid) / (budget_max - budget_mid)) * 0.3
     else:
         # Over budget - penalty
         overage = (uni_fees - budget_max) / budget_max
         affordability_score = max(0, 0.5 - overage)
-    
-    score += affordability_score * 0.15
-    details['affordability'] = round(affordability_score * 0.15, 3)
     
     score += affordability_score * 0.15
     details['affordability'] = round(affordability_score * 0.15, 3)
@@ -245,19 +271,19 @@ def calculate_comprehensive_score(user_data, uni_row):
     
     # Research focus
     if user_data.get('researchFocus'):
-        if uni_row.get('research_flag', 0) == 1:
+        if uni_row.get('research_focused', False):
             preference_score += 1.0
         pref_count += 1
     
     # Internship opportunities
     if user_data.get('internshipOpportunities'):
-        if uni_row.get('internship_flag', 0) == 1:
+        if uni_row.get('internship_opportunities', False):
             preference_score += 1.0
         pref_count += 1
     
     # Work visa
     if user_data.get('workVisa'):
-        if uni_row.get('visa_flag', 0) == 1:
+        if uni_row.get('post_study_work_visa', False):
             preference_score += 1.0
         pref_count += 1
     
@@ -308,10 +334,13 @@ def get_best_universities(user_data, top_n=15):
         ]
         print(f"\nAfter field filter ({user_data['major']}): {len(filtered_data)} universities")
     
-    # Step 2: Filter by country
-    if user_data.get('country') and user_data['country'] != 'Any':
-        filtered_data = filtered_data[filtered_data['country'] == user_data['country']]
-        print(f"After country filter ({user_data['country']}): {len(filtered_data)} universities")
+    # Step 2: Filter by countries (support multiple countries)
+    if user_data.get('preferred_countries') and len(user_data['preferred_countries']) > 0:
+        # Filter to include any of the selected countries
+        filtered_data = filtered_data[filtered_data['country'].isin(user_data['preferred_countries'])]
+        print(f"After country filter ({user_data['preferred_countries']}): {len(filtered_data)} universities")
+    else:
+        print(f"No country filter applied: {len(filtered_data)} universities")
     
     # Step 3: Filter by budget
     if user_data.get('budgetMin') and user_data.get('budgetMax'):
@@ -331,12 +360,16 @@ def get_best_universities(user_data, top_n=15):
         print(f"After type filter ({user_data['universityType']}): {len(filtered_data)} universities")
     
     # Step 6: Filter by duration
-    if user_data.get('duration') and user_data['duration'] < 2:
-        filtered_data = filtered_data[
-            (filtered_data['duration_years'] == user_data['duration']) |
-            filtered_data['duration_years'].isna()
-        ]
-        print(f"After duration filter ({user_data['duration']} year): {len(filtered_data)} universities")
+    if user_data.get('duration') and user_data['duration'] != 'Any':
+        try:
+            desired_duration = int(user_data['duration'])
+            filtered_data = filtered_data[
+                (filtered_data['duration_years'] == desired_duration) |
+                filtered_data['duration_years'].isna()
+            ]
+            print(f"After duration filter ({desired_duration} year): {len(filtered_data)} universities")
+        except (ValueError, TypeError):
+            print(f"Invalid duration value: {user_data['duration']}, skipping duration filter")
     
     # Step 7: Calculate comprehensive scores for all filtered universities
     print(f"\n=== Calculating Comprehensive Scores ===")
@@ -360,19 +393,49 @@ def get_best_universities(user_data, top_n=15):
         print(f"  {i}. {item['uni_name']} ({item['country']}) - Score: {item['score']:.3f}")
         print(f"     Breakdown: {item['details']}")
     
-    # Get top N unique universities
+    # Get top N unique universities with country diversity
     seen_universities = set()
+    country_counts = {}
     top_universities = []
+    
+    # Initialize country counts for selected countries
+    if user_data.get('preferred_countries'):
+        for country in user_data['preferred_countries']:
+            country_counts[country] = 0
+    
+    # First pass: Try to get at least 2-3 universities from each selected country
+    max_per_country = max(2, top_n // len(user_data.get('preferred_countries', [1])))
     
     for item in scores_list:
         uni_name = item['uni_name']
+        country = item['country']
+        
         if uni_name not in seen_universities:
-            seen_universities.add(uni_name)
-            top_universities.append(item['idx'])
-            if len(top_universities) >= top_n:
-                break
+            # Check if we should add this university for diversity
+            if not user_data.get('preferred_countries') or country_counts.get(country, 0) < max_per_country:
+                seen_universities.add(uni_name)
+                top_universities.append(item['idx'])
+                country_counts[country] = country_counts.get(country, 0) + 1
+                
+                if len(top_universities) >= top_n:
+                    break
+    
+    # Second pass: Fill remaining slots with best remaining universities
+    if len(top_universities) < top_n:
+        for item in scores_list:
+            uni_name = item['uni_name']
+            if uni_name not in seen_universities:
+                seen_universities.add(uni_name)
+                top_universities.append(item['idx'])
+                if len(top_universities) >= top_n:
+                    break
     
     print(f"\nSelected {len(top_universities)} unique universities")
+    if user_data.get('preferred_countries'):
+        print("Country distribution:")
+        for country in user_data['preferred_countries']:
+            count = country_counts.get(country, 0)
+            print(f"  {country}: {count} universities")
     
     return top_universities, filtered_data, scores_list[:top_n]
 
@@ -403,42 +466,28 @@ def graduatealgo():
         publications = int(src_args.get("publications", 0))
         
         # Get preferences
-        country = src_args.get("country", "Any")
         budgetMin = float(src_args.get("budgetMin", 0))
         budgetMax = float(src_args.get("budgetMax", 100000))
         universityType = src_args.get("universityType", "Any")
-        duration = int(src_args.get("duration", 2))
+        duration = src_args.get("duration", "Any")  # Keep as string to handle "Any"
         
         # Get boolean preferences
         researchFocus = src_args.get("researchFocus") == "true"
         internshipOpportunities = src_args.get("internshipOpportunities") == "true"
         workVisa = src_args.get("workVisa") == "true"
         
-        # Parse preferred_countries (multi-select support)
+        # Simplified country selection - support multiple countries
         if request.method == 'POST':
-            raw_pref = request.form.getlist('preferred_countries') or request.form.get('preferred_countries')
+            preferred_countries = request.form.getlist('preferred_countries')
         else:
-            raw_pref = request.args.getlist('preferred_countries') or request.args.get('preferred_countries')
+            preferred_countries = request.args.getlist('preferred_countries')
         
-        if isinstance(raw_pref, list):
-            preferred_countries = raw_pref
-        elif isinstance(raw_pref, str) and raw_pref:
-            try:
-                preferred_countries = _json.loads(raw_pref)
-                if isinstance(preferred_countries, str):
-                    preferred_countries = [preferred_countries]
-                elif not isinstance(preferred_countries, list):
-                    preferred_countries = [raw_pref]
-            except Exception:
-                preferred_countries = [c.strip() for c in raw_pref.split(',') if c.strip()]
+        # Keep all selected countries for multi-country recommendations
+        if preferred_countries and len(preferred_countries) > 0:
+            # Remove any empty or invalid selections
+            preferred_countries = [c.strip() for c in preferred_countries if c and c.strip()]
         else:
-            preferred_countries = [country] if country and country.lower() not in ('any', 'select country') else []
-        
-        preferred_countries = [c.strip() for c in preferred_countries if c and c.strip() and c.strip().lower() not in ["any", "any country", "select country"]]
-        
-        # If multiple countries selected, use first one for single country filter
-        if preferred_countries:
-            country = preferred_countries[0]
+            preferred_countries = []
         
         print(f"\n{'='*60}")
         print(f"Processing Comprehensive Recommendation Request")
@@ -446,10 +495,11 @@ def graduatealgo():
         print(f"Academic: GRE V:{greV}, Q:{greQ}, A:{greA}, GPA:{cgpa}")
         print(f"Language: {englishTest} - IELTS:{ielts}, TOEFL:{toefl}")
         print(f"Background: Major:{major}, Experience:{workExperience}y, Publications:{publications}")
-        print(f"Preferences: Country:{country}, Budget:${budgetMin}-${budgetMax}")
-        print(f"Filters: Type:{universityType}, Duration:{duration}y")
+        print(f"Selected Countries: {preferred_countries} ({len(preferred_countries)} countries)")
+        print(f"Budget: ${budgetMin}-${budgetMax}")
+        print(f"Filters: Type:{universityType}, Duration:{duration}")
         print(f"Boolean Prefs: Research:{researchFocus}, Internship:{internshipOpportunities}, Visa:{workVisa}")
-        print(f"{'='*60}\n")
+        print(f"{'='*60}\\n")
         
         # Build user data dictionary
         user_data = {
@@ -460,7 +510,7 @@ def graduatealgo():
             'major': major,
             'workExperience': workExperience,
             'publications': publications,
-            'country': country,
+            'preferred_countries': preferred_countries,  # List of selected countries
             'budgetMin': budgetMin,
             'budgetMax': budgetMax,
             'universityType': universityType,
