@@ -1,5 +1,6 @@
 import random
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, jsonify, session
+from flask_session import Session
 from markupsafe import escape
 import pandas as pd
 import numpy as np
@@ -8,7 +9,46 @@ import math
 from sklearn import neighbors, datasets
 from numpy.random import permutation
 from sklearn.metrics import precision_recall_fscore_support
+import os
+import sys
+from datetime import datetime, timedelta
+
+# Import configuration and custom modules
+from config import DevelopmentConfig
+from database import Database
+from auth import auth_bp, init_auth, login_required, admin_required
+from collaborative_filter import CollaborativeFilter
+
+# Initialize Flask app
 app = Flask(__name__, static_folder='../static', template_folder='../static')
+app.config.from_object(DevelopmentConfig)
+
+# Initialize Flask-Session
+Session(app)
+
+# Cache for collaborative groups (refresh every 30 minutes)
+groups_cache = {
+    'data': None,
+    'timestamp': None
+}
+
+# Initialize MongoDB database
+try:
+    db = Database(app.config['MONGODB_URI'], app.config['MONGODB_DB_NAME'])
+    print("✓ Database initialized successfully")
+except Exception as e:
+    print(f"✗ Database initialization failed: {e}")
+    print("⚠ Application will run in limited mode without user features")
+    db = None
+
+# Initialize authentication
+if db:
+    init_auth(db)
+    app.register_blueprint(auth_bp)
+    print("✓ Authentication system initialized")
+
+# Initialize collaborative filtering
+collab_filter = CollaborativeFilter(db, weight=0.3) if db else None
 
 # Load and prepare enhanced data once at startup for better performance
 print("Loading and preparing real university data...")
@@ -75,8 +115,74 @@ def index():
     return render_template('index.html')
 
 @app.route('/graduate')
+@login_required
 def graduate():
     return render_template('graduate.html')
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    # Redirect admins to admin dashboard
+    if session.get('user_role') == 'admin':
+        return redirect('/admin')
+    return render_template('dashboard.html')
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    return render_template('admin.html')
+
+@app.route('/api/check-auth')
+def check_auth():
+    """Check if user is authenticated"""
+    return jsonify({
+        'authenticated': 'user_id' in session,
+        'role': session.get('user_role', 'user')
+    })
+
+@app.route('/api/user')
+@login_required
+def get_user_data():
+    """Get current user data and statistics"""
+    try:
+        user_id = session.get('user_id')
+        user = db.get_user_by_id(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Get user statistics
+        history = db.get_user_history(user_id)
+        wishlist = db.get_wishlist(user_id)
+        
+        # Calculate unique universities
+        unique_universities = set()
+        for entry in history:
+            if 'recommendations' in entry:
+                for rec in entry['recommendations']:
+                    unique_universities.add(rec.get('university_name'))
+        
+        stats = {
+            'total_searches': len(history),
+            'unique_universities': len(unique_universities),
+            'wishlist_count': len(wishlist)
+        }
+        
+        # Remove sensitive data
+        user_data = {
+            'name': user.get('name'),
+            'email': user.get('email'),
+            'role': user.get('role', 'user'),
+            'memberSince': user.get('created_at')
+        }
+        
+        return jsonify({
+            'user': user_data,
+            'stats': stats
+        })
+    except Exception as e:
+        print(f"Error getting user data: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route("/main")
 def return_main():
@@ -104,6 +210,191 @@ def get_fields():
         # Fallback
         return jsonify(['Computer Science,Engineering', 'Data Science,AI', 'Business,Management', 
                        'Engineering,Robotics', 'Mathematics,Statistics', 'Physics,Applied Sciences'])
+
+@app.route('/api/history')
+@login_required
+def get_history():
+    """Get user's search history"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        user_id = session.get('user_id')
+        history = db.get_user_history(user_id, limit=20)
+        
+        return jsonify({
+            'success': True,
+            'history': history,
+            'count': len(history)
+        }), 200
+    except Exception as e:
+        print(f"Error getting history: {e}")
+        return jsonify({'error': 'Failed to fetch history'}), 500
+
+@app.route('/api/history/<search_id>', methods=['DELETE'])
+@login_required
+def delete_history_item(search_id):
+    """Delete a specific search from history"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        user_id = session.get('user_id')
+        success = db.delete_search(user_id, search_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Search deleted'}), 200
+        else:
+            return jsonify({'error': 'Search not found'}), 404
+    except Exception as e:
+        print(f"Error deleting history: {e}")
+        return jsonify({'error': 'Failed to delete search'}), 500
+
+# ==================== WISHLIST API ROUTES ====================
+
+@app.route('/api/wishlist', methods=['GET'])
+@login_required
+def get_wishlist():
+    """Get user's wishlist"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        user_id = session.get('user_id')
+        wishlist = db.get_wishlist(user_id)
+        
+        return jsonify({
+            'success': True,
+            'wishlist': wishlist,
+            'count': len(wishlist)
+        }), 200
+    except Exception as e:
+        print(f"Error getting wishlist: {e}")
+        return jsonify({'error': 'Failed to fetch wishlist'}), 500
+
+@app.route('/api/wishlist', methods=['POST'])
+@login_required
+def add_to_wishlist():
+    """Add university to wishlist"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        data = request.get_json()
+        user_id = session.get('user_id')
+        
+        # Validate required fields
+        if not data or 'name' not in data:
+            return jsonify({'error': 'University name is required'}), 400
+        
+        success = db.add_to_wishlist(user_id, data)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Added to wishlist'}), 200
+        else:
+            return jsonify({'error': 'Failed to add to wishlist'}), 500
+    except Exception as e:
+        print(f"Error adding to wishlist: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Failed to add to wishlist: {str(e)}'}), 500
+
+@app.route('/api/wishlist/<university_name>', methods=['DELETE'])
+@login_required
+def remove_from_wishlist(university_name):
+    """Remove university from wishlist"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        user_id = session.get('user_id')
+        success = db.remove_from_wishlist(user_id, university_name)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Removed from wishlist'}), 200
+        else:
+            return jsonify({'error': 'Not found in wishlist'}), 404
+    except Exception as e:
+        print(f"Error removing from wishlist: {e}")
+        return jsonify({'error': 'Failed to remove from wishlist'}), 500
+
+# ==================== ADMIN API ROUTES ====================
+
+@app.route('/api/admin/stats')
+@admin_required
+def get_admin_stats():
+    """Get system-wide statistics (admin only)"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        stats = db.get_system_statistics()
+        return jsonify({
+            'success': True,
+            'stats': stats
+        }), 200
+    except Exception as e:
+        print(f"Error getting admin stats: {e}")
+        return jsonify({'error': 'Failed to fetch statistics'}), 500
+
+@app.route('/api/admin/users')
+@admin_required
+def get_admin_users():
+    """Get all users with stats (admin only)"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        users = db.get_all_users_with_stats()
+        return jsonify({
+            'success': True,
+            'users': users,
+            'count': len(users)
+        }), 200
+    except Exception as e:
+        print(f"Error getting users: {e}")
+        return jsonify({'error': 'Failed to fetch users'}), 500
+
+@app.route('/api/admin/groups')
+@admin_required
+def get_admin_groups():
+    """Get collaborative filtering groups (admin only) - with caching"""
+    try:
+        if not db:
+            return jsonify({'error': 'Database not available'}), 503
+        
+        # Check cache (30 minute expiry)
+        now = datetime.now()
+        if groups_cache['data'] is not None and groups_cache['timestamp'] is not None:
+            cache_age = (now - groups_cache['timestamp']).total_seconds()
+            if cache_age < 1800:  # 30 minutes
+                print(f"Returning cached groups (age: {int(cache_age)}s)")
+                return jsonify({
+                    'success': True,
+                    'groups': groups_cache['data'],
+                    'count': len(groups_cache['data']),
+                    'cached': True
+                }), 200
+        
+        # Calculate groups (this takes time)
+        print("Calculating collaborative groups (cache expired or empty)...")
+        groups = db.get_user_collaborative_groups()
+        
+        # Update cache
+        groups_cache['data'] = groups
+        groups_cache['timestamp'] = now
+        
+        return jsonify({
+            'success': True,
+            'groups': groups,
+            'count': len(groups),
+            'cached': False
+        }), 200
+    except Exception as e:
+        print(f"Error getting groups: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch groups'}), 500
 
 
 def calculate_comprehensive_score(user_data, uni_row):
@@ -441,6 +732,7 @@ def get_best_universities(user_data, top_n=15):
 
 
 @app.route('/graduatealgo', methods=['GET', 'POST'])
+@login_required
 def graduatealgo():
     try:
         import json as _json
@@ -525,7 +817,7 @@ def graduatealgo():
         if toefl:
             user_data['toefl'] = toefl
         
-        # Get best universities
+        # Get best universities using content-based filtering
         top_indices, filtered_df, score_details = get_best_universities(user_data, top_n=15)
         
         # Build university details
@@ -570,9 +862,60 @@ def graduatealgo():
                 'post_study_work_visa': bool(uni_row.get('post_study_work_visa', False)),
             })
         
+        # Apply collaborative filtering if user is logged in and database is available
+        if db and 'user_id' in session and collab_filter:
+            try:
+                print("\n=== Applying Hybrid Filtering (Content + Collaborative) ===")
+                uni_details = collab_filter.get_hybrid_recommendations(
+                    session['user_id'], 
+                    uni_details, 
+                    limit=15
+                )
+                print(f"✓ Hybrid recommendations generated")
+            except Exception as e:
+                print(f"⚠ Collaborative filtering failed, using content-based only: {e}")
+        
         print(f"\n=== Final Recommendations ===")
         for i, detail in enumerate(uni_details[:10], 1):
-            print(f"{i}. {detail['name']} ({detail['country']}) - Score: {detail['score']:.3f}, Rank: {detail['ranking']}")
+            score_info = f"Hybrid: {detail.get('hybrid_score', detail['score']):.2f}" if 'hybrid_score' in detail else f"Score: {detail['score']:.3f}"
+            collab_badge = " [✓ Collab]" if detail.get('has_collaborative') else ""
+            print(f"{i}. {detail['name']} ({detail['country']}) - {score_info}, Rank: {detail['ranking']}{collab_badge}")
+        
+        # Save search history if user is logged in
+        if db and 'user_id' in session:
+            try:
+                search_data = {
+                    'greV': greV,
+                    'greQ': greQ,
+                    'greA': greA,
+                    'cgpa': cgpa,
+                    'ielts': ielts,
+                    'toefl': toefl,
+                    'major': major,
+                    'workExperience': workExperience,
+                    'publications': publications,
+                    'country': preferred_countries,
+                    'budgetMin': budgetMin,
+                    'budgetMax': budgetMax,
+                    'universityType': universityType,
+                    'duration': duration,
+                    'researchFocus': researchFocus,
+                    'internshipOpportunities': internshipOpportunities,
+                    'workVisa': workVisa
+                }
+                
+                # Simplify recommendations for storage
+                recommendations = [{
+                    'name': uni['name'],
+                    'country': uni['country'],
+                    'score': uni.get('hybrid_score', uni['score']),
+                    'ranking': uni['ranking']
+                } for uni in uni_details]
+                
+                search_id = db.save_search(session['user_id'], search_data, recommendations)
+                print(f"✓ Search history saved (ID: {search_id})")
+            except Exception as e:
+                print(f"⚠ Failed to save search history: {e}")
         
         # Generate results HTML with filtering capabilities
         return generate_results_html(uni_details, user_data)

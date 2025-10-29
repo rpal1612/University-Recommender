@@ -7,3 +7,6 @@ Werkzeug
 beautifulsoup4
 requests
 lxml
+pymongo
+bcrypt
+Flask-Session

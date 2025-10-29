@@ -17,7 +17,9 @@
             <i class="fas fa-graduation-cap"></i>
             University Recommender
         </div>
-        <div>
+        <div class="nav-links">
+            <span id="userName" style="margin-right: 15px; color: #667eea; font-weight: 600;"></span>
+            <a href="/dashboard" class="nav-btn"><i class="fas fa-th-large"></i> Dashboard</a>
             <a href="/" class="nav-btn"><i class="fas fa-home"></i> Home</a>
         </div>
     </div>
@@ -261,5 +263,21 @@
     </div>
 
     <script src="/static/js/form.js"></script>
+    <script>
+        // Load user name
+        async function loadUserName() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('userName').textContent = data.user.name;
+                }
+            } catch (error) {
+                console.error('Error loading user name:', error);
+            }
+        }
+        
+        loadUserName();
+    </script>
 </body>
 </html>
