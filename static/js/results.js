@@ -137,6 +137,51 @@ function displayUniversities() {
                 ${uni.internship_opportunities ? '<div class="feature-tag"><i class="fas fa-briefcase"></i> Internships</div>' : ''}
                 ${uni.post_study_work_visa ? '<div class="feature-tag"><i class="fas fa-passport"></i> Work Visa</div>' : ''}
             </div>
+            
+            <div class="card-actions">
+                <button class="wishlist-btn" onclick='addToWishlist(${JSON.stringify(uni)}, event)'>
+                    <i class="fas fa-heart"></i> Add to Wishlist
+                </button>
+            </div>
         </div>
     `).join('');
+}
+
+// Add university to wishlist
+async function addToWishlist(university, event) {
+    const btn = event.target.closest('button');
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    
+    try {
+        const response = await fetch('/api/wishlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(university)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            btn.innerHTML = '<i class="fas fa-check"></i> Added!';
+            btn.style.background = '#4caf50';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-heart"></i> In Wishlist';
+                btn.style.background = '#667eea';
+            }, 2000);
+        } else {
+            alert(data.message || data.error || 'Failed to add to wishlist');
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error adding to wishlist:', error);
+        alert('Failed to add to wishlist. Please try again.');
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
 }

@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - University Recommender</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            font-size: 24px;
+        }
+
+        .navbar-menu {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .navbar-menu button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .navbar-menu button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .welcome-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid #e74c3c;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: #e74c3c;
+        }
+
+        .tab.active {
+            color: #e74c3c;
+            border-bottom-color: #e74c3c;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .label {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .group-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .group-members {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .member-tag {
+            background: #e74c3c;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #e74c3c;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <h1>🔐 Admin Dashboard</h1>
+            <div class="navbar-menu">
+                <span id="adminName" style="font-weight: 600; margin-right: 10px;">Admin</span>
+                <button onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="welcome-card">
+            <h2>System Administration Panel</h2>
+            <p>Manage users, view statistics, and analyze collaborative filtering groups</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('overview')">Overview</button>
+            <button class="tab" onclick="switchTab('users')">All Users</button>
+            <button class="tab" onclick="switchTab('groups')">Collaborative Groups</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content active">
+            <div class="stats-grid" id="statsGrid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading statistics...</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Popular Universities</h3>
+                <table id="popularUniversities">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>University</th>
+                            <th>Times Recommended</th>
+                            <th>Avg Match Score</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h3>Popular Countries</h3>
+                <table id="popularCountries">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Country</th>
+                            <th>Recommendations</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users-tab" class="tab-content">
+            <div class="section">
+                <h3>All Registered Users</h3>
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Member Since</th>
+                            <th>Total Searches</th>
+                            <th>Universities Explored</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Collaborative Groups Tab -->
+        <div id="groups-tab" class="tab-content">
+            <div class="section">
+                <h3>User Similarity Groups</h3>
+                <p style="color: #666; margin-bottom: 20px;">Users are grouped based on country preference, course preference, and score range</p>
+                
+                <!-- Filter Section -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: #333;">🔍 Filter Groups</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Country</label>
+                            <select id="filterCountry" onchange="applyGroupFilters()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                                <option value="">All Countries</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Course</label>
+                            <select id="filterCourse" onchange="applyGroupFilters()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                                <option value="">All Courses</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Score Range</label>
+                            <select id="filterScore" onchange="applyGroupFilters()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                                <option value="">All Score Ranges</option>
+                                <option value="High">High (8.5+)</option>
+                                <option value="Medium">Medium (7-8.5)</option>
+                                <option value="Low">Low (<7)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Min Members</label>
+                            <input type="number" id="filterMinMembers" min="2" placeholder="e.g., 5" onchange="applyGroupFilters()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button onclick="applyGroupFilters()" style="padding: 8px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            Apply Filters
+                        </button>
+                        <button onclick="clearGroupFilters()" style="padding: 8px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            Clear All
+                        </button>
+                        <span id="filterStats" style="margin-left: auto; align-self: center; color: #666; font-size: 14px;"></span>
+                    </div>
+                </div>
+                
+                <div id="groupsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'overview';
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+
+            currentTab = tabName;
+
+            // Load data for tab
+            if (tabName === 'overview') {
+                loadOverview();
+            } else if (tabName === 'users') {
+                loadUsers();
+            } else if (tabName === 'groups') {
+                loadGroups();
+            }
+        }
+
+        async function loadOverview() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                if (!response.ok) throw new Error('Failed to load stats');
+
+                const data = await response.json();
+                if (data.stats) {
+                    displayStats(data.stats);
+                } else {
+                    throw new Error('No stats data received');
+                }
+            } catch (error) {
+                console.error('Error loading overview:', error);
+                document.getElementById('statsGrid').innerHTML = '<p style="color: red;">Error loading statistics. Please refresh the page.</p>';
+            }
+        }
+
+        function displayStats(stats) {
+            // Ensure stats object has required properties
+            if (!stats) {
+                console.error('Stats is null or undefined');
+                return;
+            }
+            
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-card">
+                    <div class="number">${stats.total_users || 0}</div>
+                    <div class="label">Total Users</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">${stats.total_searches || 0}</div>
+                    <div class="label">Total Searches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">${stats.total_recommendations || 0}</div>
+                    <div class="label">Universities Recommended</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">${(stats.total_searches / Math.max(stats.total_users, 1)).toFixed(1)}</div>
+                    <div class="label">Avg Searches/User</div>
+                </div>
+            `;
+
+            // Popular universities
+            const uniTableBody = document.querySelector('#popularUniversities tbody');
+            if (uniTableBody && stats.popular_universities) {
+                uniTableBody.innerHTML = stats.popular_universities.map((uni, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${uni.name}</td>
+                        <td>${uni.count}</td>
+                        <td>${uni.avg_score}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Popular countries
+            const countryTableBody = document.querySelector('#popularCountries tbody');
+            if (countryTableBody && stats.popular_countries) {
+                countryTableBody.innerHTML = stats.popular_countries.map((country, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${country.country}</td>
+                        <td>${country.count}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                if (!response.ok) {
+                    console.error('Response not OK:', response.status, response.statusText);
+                    throw new Error('Failed to load users');
+                }
+
+                const data = await response.json();
+                console.log('Users data received:', data);
+                console.log('Number of users:', data.users?.length);
+                if (data.users && data.users.length > 0) {
+                    console.log('First user:', data.users[0]);
+                }
+                displayUsers(data.users || []);
+            } catch (error) {
+                console.error('Error loading users:', error);
+                const tbody = document.querySelector('#usersTable tbody');
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red;">Error loading users. Check console for details.</td></tr>';
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.querySelector('#usersTable tbody');
+            
+            if (!users || users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No users found</td></tr>';
+                return;
+            }
+            
+            console.log('Displaying users:', users.length);
+            tbody.innerHTML = users.map(user => {
+                const memberSince = new Date(user.created_at).toLocaleDateString();
+                const userName = user.name || user.email.split('@')[0];
+                return `
+                    <tr>
+                        <td>${userName}</td>
+                        <td>${user.email}</td>
+                        <td>${memberSince}</td>
+                        <td>${user.stats?.total_searches || 0}</td>
+                        <td>${user.stats?.unique_universities || 0}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Global variable to store all groups
+        let allGroups = [];
+
+        async function loadGroups() {
+            try {
+                console.log('Loading groups...');
+                
+                // Show loading message
+                const container = document.getElementById('groupsContainer');
+                container.innerHTML = '<div style="text-align: center; padding: 40px;"><p>⏳ Loading collaborative groups... This may take 10-20 seconds on first load.</p><p style="color: #666; font-size: 14px;">Subsequent loads will be instant (cached for 30 minutes)</p></div>';
+                
+                const response = await fetch('/api/admin/groups');
+                if (!response.ok) {
+                    console.error('Response not OK:', response.status, response.statusText);
+                    throw new Error('Failed to load groups');
+                }
+
+                const data = await response.json();
+                console.log('Groups data received:', data);
+                console.log('Number of groups:', data.groups?.length);
+                console.log('From cache:', data.cached);
+                if (data.groups && data.groups.length > 0) {
+                    console.log('First group:', data.groups[0]);
+                }
+                
+                // Store groups and populate filters
+                allGroups = data.groups || [];
+                populateFilterDropdowns(allGroups);
+                displayGroups(allGroups);
+            } catch (error) {
+                console.error('Error loading groups:', error);
+                const container = document.getElementById('groupsContainer');
+                container.innerHTML = '<p style="color: red;">Error loading groups. Check console for details.</p>';
+            }
+        }
+
+        function displayGroups(groups) {
+            const container = document.getElementById('groupsContainer');
+            
+            if (!groups || groups.length === 0) {
+                container.innerHTML = '<p>No groups found yet. Groups form when users have similar preferences.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <p style="margin-bottom: 20px; color: #666;">
+                    Showing ${groups.length} preference-based groups (sorted by size). 
+                    Groups are formed based on country preference, course preference, and score range.
+                </p>
+            ` + groups.map((group, index) => `
+                <div class="group-card">
+                    <div class="group-header">
+                        <h4>Group ${group.group_id}</h4>
+                        <span class="badge badge-info">${group.size} member${group.size !== 1 ? 's' : ''}</span>
+                    </div>
+                    
+                    <div style="margin: 15px 0; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; font-size: 13px;">
+                            <div>
+                                <strong style="display: block; margin-bottom: 5px; opacity: 0.9;">🌍 Country</strong>
+                                <div style="font-size: 14px; font-weight: 600;">${group.country_preference || 'Any'}</div>
+                            </div>
+                            <div>
+                                <strong style="display: block; margin-bottom: 5px; opacity: 0.9;">📚 Course</strong>
+                                <div style="font-size: 14px; font-weight: 600;">${group.course_preference || 'General'}</div>
+                            </div>
+                            <div>
+                                <strong style="display: block; margin-bottom: 5px; opacity: 0.9;">🎯 Score Range</strong>
+                                <div style="font-size: 14px; font-weight: 600;">${group.score_range || 'N/A'}</div>
+                            </div>
+                        </div>
+                        ${group.group_avg_cgpa ? `
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3); font-size: 12px;">
+                                <strong>Group Averages:</strong> CGPA: ${group.group_avg_cgpa} ${group.group_avg_gre > 0 ? `| GRE: ${group.group_avg_gre}` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="group-members" id="members-${index}">
+                        ${group.members.slice(0, 10).map(member => `
+                            <span class="member-tag" title="${member.email} - CGPA: ${member.cgpa || 'N/A'}">${member.name}</span>
+                        `).join('')}
+                        ${group.members.length > 10 ? `<span class="member-tag" style="background: #e0e0e0;">+${group.members.length - 10} more</span>` : ''}
+                    </div>
+                    
+                    ${group.members.length > 10 ? `
+                        <button onclick="toggleAllMembers(${index}, ${JSON.stringify(group.members).replace(/"/g, '&quot;')})" 
+                                id="toggle-btn-${index}"
+                                style="margin-top: 10px; padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            Show All ${group.members.length} Members
+                        </button>
+                    ` : ''}
+                    
+                    ${group.common_universities && group.common_universities.length > 0 ? `
+                        <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                            <strong style="color: #495057;">🏛️ Common Universities:</strong>
+                            <div style="margin-top: 5px;">
+                                ${group.common_universities.slice(0, 8).map(uni => `
+                                    <span style="display: inline-block; background: #e7f3ff; color: #0056b3; padding: 3px 8px; margin: 3px; border-radius: 3px; font-size: 12px;">
+                                        ${uni}
+                                    </span>
+                                `).join('')}
+                                ${group.common_universities.length > 8 ? `<span style="color: #666; font-size: 12px;">+${group.common_universities.length - 8} more</span>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function toggleAllMembers(index, members) {
+            const container = document.getElementById(`members-${index}`);
+            const button = document.getElementById(`toggle-btn-${index}`);
+            
+            if (button.textContent.startsWith('Show All')) {
+                // Show all members
+                container.innerHTML = members.map(member => `
+                    <span class="member-tag" title="${member.email} - CGPA: ${member.cgpa || 'N/A'}">${member.name}</span>
+                `).join('');
+                button.textContent = 'Show Less';
+            } else {
+                // Show first 10 members
+                container.innerHTML = `
+                    ${members.slice(0, 10).map(member => `
+                        <span class="member-tag" title="${member.email} - CGPA: ${member.cgpa || 'N/A'}">${member.name}</span>
+                    `).join('')}
+                    ${members.length > 10 ? `<span class="member-tag" style="background: #e0e0e0;">+${members.length - 10} more</span>` : ''}
+                `;
+                button.textContent = `Show All ${members.length} Members`;
+            }
+        }
+
+        // Filter functions for groups
+        function populateFilterDropdowns(groups) {
+            // Extract unique values
+            const countries = new Set();
+            const courses = new Set();
+            
+            groups.forEach(group => {
+                if (group.country_preference) countries.add(group.country_preference);
+                if (group.course_preference) courses.add(group.course_preference);
+            });
+            
+            // Populate country dropdown
+            const countrySelect = document.getElementById('filterCountry');
+            countrySelect.innerHTML = '<option value="">All Countries</option>' + 
+                Array.from(countries).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            // Populate course dropdown
+            const courseSelect = document.getElementById('filterCourse');
+            courseSelect.innerHTML = '<option value="">All Courses</option>' + 
+                Array.from(courses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function applyGroupFilters() {
+            const filterCountry = document.getElementById('filterCountry').value;
+            const filterCourse = document.getElementById('filterCourse').value;
+            const filterScore = document.getElementById('filterScore').value;
+            const filterMinMembers = parseInt(document.getElementById('filterMinMembers').value) || 0;
+            
+            let filteredGroups = allGroups.filter(group => {
+                // Country filter
+                if (filterCountry && group.country_preference !== filterCountry) {
+                    return false;
+                }
+                
+                // Course filter
+                if (filterCourse && group.course_preference !== filterCourse) {
+                    return false;
+                }
+                
+                // Score range filter
+                if (filterScore && !group.score_range.includes(filterScore)) {
+                    return false;
+                }
+                
+                // Min members filter
+                if (filterMinMembers > 0 && group.size < filterMinMembers) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            // Update filter stats
+            const filterStats = document.getElementById('filterStats');
+            filterStats.textContent = `Showing ${filteredGroups.length} of ${allGroups.length} groups`;
+            
+            displayGroups(filteredGroups);
+        }
+
+        function clearGroupFilters() {
+            document.getElementById('filterCountry').value = '';
+            document.getElementById('filterCourse').value = '';
+            document.getElementById('filterScore').value = '';
+            document.getElementById('filterMinMembers').value = '';
+            
+            const filterStats = document.getElementById('filterStats');
+            filterStats.textContent = '';
+            
+            displayGroups(allGroups);
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', { method: 'POST' });
+                if (response.ok) {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        async function loadAdminName() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('adminName').textContent = data.user.name;
+                }
+            } catch (error) {
+                console.error('Error loading admin name:', error);
+            }
+        }
+
+        // Load overview on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadOverview();
+            loadAdminName();
+        });
+    </script>
+</body>
+</html>
