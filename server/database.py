@@ -433,124 +433,139 @@ class Database:
             return []
     
     def get_user_collaborative_groups(self):
-        """Group users by collaborative filtering similarity (admin only) - Optimized version"""
+        """Group users by country, course, and score preferences - Fast & Dynamic"""
         try:
-            print("Building collaborative groups (optimized)...")
+            print("Building preference-based groups (country, course, score)...")
             
-            # Step 1: Get all users with their universities in one query
-            print("  Step 1: Fetching user-university mappings...")
+            # Step 1: Aggregate user preferences from search history
+            print("  Step 1: Analyzing user search preferences...")
             pipeline = [
                 {'$group': {
                     '_id': '$user_id',
-                    'universities': {'$addToSet': '$university_name'}
+                    'countries': {'$addToSet': '$search_params.countries'},
+                    'majors': {'$addToSet': '$search_params.major'},
+                    'avg_cgpa': {'$avg': '$search_params.cgpa'},
+                    'avg_gre_v': {'$avg': '$search_params.greV'},
+                    'avg_gre_q': {'$avg': '$search_params.greQ'},
+                    'universities': {'$push': '$recommendations.university_name'},
+                    'search_count': {'$sum': 1}
                 }},
-                {'$match': {'universities': {'$ne': []}}},  # Only users with recommendations
-                {'$limit': 500}  # Limit for performance
+                {'$match': {'search_count': {'$gte': 1}}}  # Users with at least 1 search
             ]
             
-            user_unis = {}
-            for doc in self.recommendations.aggregate(pipeline):
-                user_unis[doc['_id']] = set(doc['universities'])
+            user_prefs = {}
+            for doc in self.search_history.aggregate(pipeline):
+                user_id = doc['_id']
+                # Flatten nested arrays and remove None/null values
+                countries = set()
+                for country_list in doc.get('countries', []):
+                    if country_list:
+                        if isinstance(country_list, list):
+                            countries.update([c for c in country_list if c])
+                        else:
+                            countries.add(country_list)
+                
+                majors = set([m for m in doc.get('majors', []) if m])
+                
+                user_prefs[user_id] = {
+                    'countries': countries,
+                    'majors': majors,
+                    'avg_cgpa': round(doc.get('avg_cgpa', 0) or 0, 2),
+                    'avg_gre': round(((doc.get('avg_gre_v', 0) or 0) + (doc.get('avg_gre_q', 0) or 0)) / 2, 1),
+                    'universities': set([u for sublist in doc.get('universities', []) for u in (sublist if isinstance(sublist, list) else [sublist]) if u])
+                }
             
-            print(f"  Found {len(user_unis)} users with recommendations")
+            print(f"  Found {len(user_prefs)} users with search history")
             
-            if len(user_unis) == 0:
-                print("  No users with recommendations found")
+            if len(user_prefs) == 0:
                 return []
             
-            # Step 2: Get user details for these users only
+            # Step 2: Get user details
             print("  Step 2: Fetching user details...")
-            user_ids = list(user_unis.keys())
-            users_cursor = self.users.find({'_id': {'$in': [ObjectId(uid) for uid in user_ids if len(uid) == 24]}})
+            user_ids_obj = [ObjectId(uid) for uid in user_prefs.keys() if len(uid) == 24]
+            users_cursor = self.users.find({'_id': {'$in': user_ids_obj}})
             
             users_dict = {}
             for user in users_cursor:
                 uid = str(user['_id'])
                 users_dict[uid] = {
-                    '_id': uid,
                     'name': user.get('name', user.get('full_name', user.get('email', 'Unknown').split('@')[0])),
                     'email': user.get('email', 'unknown@email.com')
                 }
             
-            print(f"  Loaded {len(users_dict)} user details")
+            # Step 3: Dynamic grouping by preferences
+            print("  Step 3: Creating preference-based groups...")
+            groups_dict = {}  # key: (country, major, score_range)
             
-            # Step 3: Build similarity matrix efficiently (only for users with >30% similarity)
-            print("  Step 3: Calculating similarities...")
-            groups = []
-            processed = set()
-            similarity_threshold = 0.25  # Lower threshold for better grouping
-            
-            user_list = list(user_unis.keys())
-            
-            for i, user_id in enumerate(user_list):
-                if i % 100 == 0:
-                    print(f"    Progress: {i}/{len(user_list)} users processed, {len(groups)} groups found")
-                
-                if user_id in processed:
+            for user_id, prefs in user_prefs.items():
+                if user_id not in users_dict:
                     continue
                 
-                user_universities = user_unis[user_id]
-                if len(user_universities) == 0:
-                    continue
+                # Categorize score range (High: >8.5, Medium: 7-8.5, Low: <7)
+                if prefs['avg_cgpa'] >= 8.5:
+                    score_category = 'High (8.5+)'
+                elif prefs['avg_cgpa'] >= 7.0:
+                    score_category = 'Medium (7-8.5)'
+                else:
+                    score_category = 'Low (<7)'
                 
-                # Find similar users quickly
-                group_members = [user_id]
-                similarities = []
-                
-                # Only check remaining users
-                for other_id in user_list[i+1:]:
-                    if other_id in processed:
-                        continue
-                    
-                    other_universities = user_unis[other_id]
-                    if len(other_universities) == 0:
-                        continue
-                    
-                    # Quick similarity check
-                    intersection = user_universities & other_universities
-                    if len(intersection) == 0:
-                        continue
-                    
-                    union = user_universities | other_universities
-                    similarity = len(intersection) / len(union)
-                    
-                    if similarity >= similarity_threshold:
-                        group_members.append(other_id)
-                        similarities.append({
-                            'user_id': other_id,
-                            'similarity': round(similarity, 3)
+                # Create groups for each combination of preferences
+                for country in (prefs['countries'] or ['Any']):
+                    for major in (prefs['majors'] or ['General']):
+                        group_key = (country, major, score_category)
+                        
+                        if group_key not in groups_dict:
+                            groups_dict[group_key] = {
+                                'country': country,
+                                'major': major,
+                                'score_range': score_category,
+                                'members': [],
+                                'universities': set(),
+                                'avg_cgpa_list': [],
+                                'avg_gre_list': []
+                            }
+                        
+                        groups_dict[group_key]['members'].append({
+                            'id': user_id,
+                            'name': users_dict[user_id]['name'],
+                            'email': users_dict[user_id]['email'],
+                            'cgpa': prefs['avg_cgpa'],
+                            'gre': prefs['avg_gre']
                         })
-                
-                # Create group if we found similar users
-                if len(group_members) > 1:
-                    processed.update(group_members)
-                    
-                    # Get user details
-                    group_users = []
-                    for uid in group_members:
-                        if uid in users_dict:
-                            group_users.append({
-                                'id': uid,
-                                'name': users_dict[uid]['name'],
-                                'email': users_dict[uid]['email']
-                            })
+                        groups_dict[group_key]['universities'].update(prefs['universities'])
+                        groups_dict[group_key]['avg_cgpa_list'].append(prefs['avg_cgpa'])
+                        groups_dict[group_key]['avg_gre_list'].append(prefs['avg_gre'])
+            
+            # Step 4: Format groups (only groups with 2+ members)
+            print("  Step 4: Formatting groups...")
+            groups = []
+            for idx, (group_key, group_data) in enumerate(groups_dict.items(), 1):
+                if len(group_data['members']) >= 2:  # Only groups with multiple members
+                    avg_cgpa = sum(group_data['avg_cgpa_list']) / len(group_data['avg_cgpa_list'])
+                    avg_gre = sum(group_data['avg_gre_list']) / len(group_data['avg_gre_list']) if group_data['avg_gre_list'] else 0
                     
                     groups.append({
-                        'group_id': len(groups) + 1,
-                        'members': group_users,
-                        'size': len(group_users),
-                        'avg_similarity': round(sum(s['similarity'] for s in similarities) / max(len(similarities), 1), 3),
-                        'similarities': sorted(similarities, key=lambda x: x['similarity'], reverse=True)[:3]
+                        'group_id': idx,
+                        'country_preference': group_data['country'],
+                        'course_preference': group_data['major'],
+                        'score_range': group_data['score_range'],
+                        'members': group_data['members'],
+                        'size': len(group_data['members']),
+                        'common_universities': sorted(list(group_data['universities']))[:10],
+                        'group_avg_cgpa': round(avg_cgpa, 2),
+                        'group_avg_gre': round(avg_gre, 1),
+                        'formation_criteria': {
+                            'country': group_data['country'],
+                            'course': group_data['major'],
+                            'score': group_data['score_range']
+                        }
                     })
             
-            print(f"  Step 4: Sorting and finalizing {len(groups)} groups")
-            
-            # Sort by size and limit
+            # Sort by size (largest first)
             groups.sort(key=lambda x: x['size'], reverse=True)
-            top_groups = groups[:30]  # Show top 30 groups
             
-            print(f"✓ Completed! Returning {len(top_groups)} collaborative groups")
-            return top_groups
+            print(f"✓ Created {len(groups)} preference-based groups")
+            return groups[:50]  # Return top 50 groups
         
         except Exception as e:
             print(f"Error getting collaborative groups: {e}")
@@ -591,18 +606,31 @@ class Database:
                 'total_searches': total_searches,
                 'total_recommendations': total_recommendations,
                 'popular_universities': [
-                    {'name': item['_id'], 'count': item['count'], 'avg_score': round(item['avg_score'], 2)}
-                    for item in popular_unis
+                    {
+                        'name': item['_id'] or 'Unknown',
+                        'count': item['count'],
+                        'avg_score': round(item['avg_score'], 2) if item['avg_score'] is not None else 0.0
+                    }
+                    for item in popular_unis if item['_id']
                 ],
                 'popular_countries': [
-                    {'country': item['_id'], 'count': item['count']}
-                    for item in popular_countries
+                    {'country': item['_id'] or 'Unknown', 'count': item['count']}
+                    for item in popular_countries if item['_id']
                 ]
             }
         
         except Exception as e:
             print(f"Error getting system stats: {e}")
-            return None
+            import traceback
+            traceback.print_exc()
+            # Return empty stats instead of None
+            return {
+                'total_users': 0,
+                'total_searches': 0,
+                'total_recommendations': 0,
+                'popular_universities': [],
+                'popular_countries': []
+            }
     
     # ==================== WISHLIST OPERATIONS ====================
     
