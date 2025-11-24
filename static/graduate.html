@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>University Recommender - Find Your Perfect Match</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <div class="top-nav">
+        <div class="logo">
+            <i class="fas fa-graduation-cap"></i>
+            University Recommender
+        </div>
+        <div class="nav-links">
+            <span id="userName" style="margin-right: 15px; color: #667eea; font-weight: 600;"></span>
+            <a href="/dashboard" class="nav-btn"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="/" class="nav-btn"><i class="fas fa-home"></i> Home</a>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Fixed Sidebar with Form -->
+        <div class="sidebar">
+            <h3><i class="fas fa-sliders-h"></i> Your Profile</h3>
+            
+            <form action="/graduatealgo" id="recommendationForm" method="POST">
+                
+                <!-- Academic Scores -->
+                <div class="form-section-title">📚 Academic Scores</div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-pen"></i> GRE Verbal</label>
+                    <input type="number" class="form-control" name="greV" placeholder="130-170" min="130" max="170" required>
+                    <small class="input-info">Range: 130-170</small>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-calculator"></i> GRE Quantitative</label>
+                    <input type="number" class="form-control" name="greQ" placeholder="130-170" min="130" max="170" required>
+                    <small class="input-info">Range: 130-170</small>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-edit"></i> GRE Analytical Writing</label>
+                    <input type="number" class="form-control" name="greA" placeholder="0.0-6.0" min="0" max="6" step="0.5" required>
+                    <small class="input-info">Range: 0.0-6.0</small>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-chart-line"></i> GPA (4.0 scale)</label>
+                    <input type="number" class="form-control" name="cgpa" placeholder="0.0-4.0" min="0" max="4" step="0.01" required>
+                    <small class="input-info">Range: 0.0-4.0</small>
+                </div>
+                
+                <!-- Language Proficiency -->
+                <div class="form-section-title">🌍 Language Proficiency</div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-language"></i> English Test</label>
+                    <select class="form-control" name="englishTest" id="englishTest" required>
+                        <option value="IELTS">IELTS</option>
+                        <option value="TOEFL">TOEFL</option>
+                        <option value="Not Attempted">Not Attempted</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="ieltsGroup">
+                    <label><i class="fas fa-certificate"></i> IELTS Score</label>
+                    <input type="number" class="form-control" name="ielts" placeholder="0.0-9.0" min="0" max="9" step="0.5" required>
+                    <small class="input-info">Range: 0.0-9.0</small>
+                </div>
+                
+                <div class="form-group" id="toeflGroup" style="display: none;">
+                    <label><i class="fas fa-certificate"></i> TOEFL Score</label>
+                    <input type="number" class="form-control" name="toefl" placeholder="0-120" min="0" max="120">
+                    <small class="input-info">Range: 0-120</small>
+                </div>
+                
+                <!-- Background -->
+                <div class="form-section-title">👨‍🎓 Background</div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-book"></i> Field of Study</label>
+                    <select class="form-control" name="major" id="major" required>
+                        <option value="">Select your field...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-briefcase"></i> Work Experience (years)</label>
+                    <input type="number" class="form-control" name="workExperience" placeholder="0-10" min="0" max="10" value="0">
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-file-alt"></i> Research Publications</label>
+                    <input type="number" class="form-control" name="publications" placeholder="0-20" min="0" max="20" value="0">
+                </div>
+                
+                <!-- Preferences -->
+                <div class="form-section-title">⚙️ Preferences</div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-globe"></i> Countries</label>
+                    <button type="button" class="select-all-btn" onclick="toggleAllCountries()">
+                        <i class="fas fa-check-double"></i> Select All Countries
+                    </button>
+                    <div class="country-checkboxes" id="countryCheckboxes">
+                        <!-- Countries will be loaded dynamically -->
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-dollar-sign"></i> Budget Range (USD/year)</label>
+                    <small class="input-info" style="display: block; margin-bottom: 10px;">
+                        💡 <strong>Typical ranges by country:</strong><br>
+                        🇩🇪 Germany: $3K-$4K | 🇨🇭 Switzerland: $1K-$2K | 🇨🇦 Canada: $17K-$26K<br>
+                        🇳🇱 Netherlands: $16K-$20K | 🇬🇧 UK: $23K-$40K | 🇦🇺 Australia: $31K-$44K<br>
+                        🇸🇬 Singapore: $31K-$37K | 🇺🇸 USA: $29K-$58K
+                    </small>
+                    <input type="number" class="form-control" name="budgetMin" placeholder="Min (e.g., 10000)" value="0">
+                    <input type="number" class="form-control" name="budgetMax" placeholder="Max (e.g., 60000)" value="60000" style="margin-top: 10px;">
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-university"></i> University Type</label>
+                    <select class="form-control" name="universityType">
+                        <option value="Any">Any</option>
+                        <option value="Public">Public</option>
+                        <option value="Private">Private</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-clock"></i> Program Duration</label>
+                    <select class="form-control" name="duration">
+<<<<<<< HEAD
+                        <option value="Any">Any Duration</option>
+                        <option value="1">1 Year Programs</option>
+=======
+                        <option value="0">Any Duration</option>
+                        <option value="1">1 Year Programs (UK only)</option>
+>>>>>>> e6394e6550d234232b15494bb7a5a333adec478e
+                        <option value="2">2 Year Programs</option>
+                    </select>
+                    <small class="input-info">⚠️ Note: 1-year programs available only in UK</small>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-check-circle"></i> Additional Preferences</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="researchFocus" id="researchFocus" value="true">
+                            <label for="researchFocus">Research-Focused Programs</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="internshipOpportunities" id="internshipOpportunities" value="true" checked>
+                            <label for="internshipOpportunities">Internship Opportunities</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="workVisa" id="workVisa" value="true" checked>
+                            <label for="workVisa">Post-Study Work Visa</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preference Weights Section -->
+                <div class="form-section-title">🎯 Customize Your Priorities</div>
+                <p class="help-text" style="margin: -10px 0 12px 0; font-size: 13px; color: #888;">
+                    Adjust what matters most (Total must = 100%)
+                </p>
+                
+                <div class="preferences-section">
+                    <div class="preference-slider">
+                        <label>🎓 Academic Prestige</label>
+                        <input type="range" name="academicWeight" id="academicWeight" min="0" max="60" value="35" oninput="updateWeights()">
+                        <span class="weight-value" id="academicValue">35%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>✅ Admission Chances</label>
+                        <input type="range" name="admissionWeight" id="admissionWeight" min="0" max="60" value="25" oninput="updateWeights()">
+                        <span class="weight-value" id="admissionValue">25%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>💰 Budget Fit</label>
+                        <input type="range" name="budgetWeight" id="budgetWeight" min="0" max="60" value="20" oninput="updateWeights()">
+                        <span class="weight-value" id="budgetValue">20%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>📈 Career Outcomes</label>
+                        <input type="range" name="careerWeight" id="careerWeight" min="0" max="60" value="10" oninput="updateWeights()">
+                        <span class="weight-value" id="careerValue">10%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>🌍 Location Preference</label>
+                        <input type="range" name="locationWeight" id="locationWeight" min="0" max="60" value="10" oninput="updateWeights()">
+                        <span class="weight-value" id="locationValue">10%</span>
+                    </div>
+                    
+                    <div class="total-weight">
+                        <strong>Total: <span id="totalWeight">100</span>%</strong>
+                        <span id="weightWarning" style="color: #ff4444; display: none; margin-left: 10px;">⚠️ Must equal 100%</span>
+                    </div>
+                </div>
+                
+                <button type="submit" class="submit-button" id="submitButton">
+                    <i class="fas fa-search"></i> Find Universities
+                </button>
+                
+                <div class="loader" id="loader">
+                    <i class="fas fa-spinner"></i>
+                    <p>Analyzing your profile...</p>
+                </div>
+                
+                <div class="info-box">
+                    <h4><i class="fas fa-info-circle"></i> Quick Tips</h4>
+                    <ul>
+                        <li>GRE sections scored 130-170</li>
+                        <li>GPA on 4.0 scale</li>
+                        <li>Select multiple countries</li>
+                        <li>Adjust budget as needed</li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Welcome Section -->
+            <div class="welcome-section">
+                <h1>🎓 Find Your Perfect University</h1>
+                <p>Get personalized recommendations based on your academic profile, preferences, and budget. Our advanced algorithm analyzes multiple factors to match you with the best universities worldwide.</p>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <i class="fas fa-university"></i>
+                    <h3>54</h3>
+                    <p>Top Universities</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-globe-americas"></i>
+                    <h3>8</h3>
+                    <p>Countries</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-book-open"></i>
+                    <h3>6</h3>
+                    <p>Fields of Study</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-chart-line"></i>
+                    <h3>AI-Powered</h3>
+                    <p>Matching</p>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="instructions">
+                <h2><i class="fas fa-info-circle"></i> How It Works</h2>
+                
+                <div class="instruction-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Enter Your Academic Details</h4>
+                        <p>Fill in your GRE scores, GPA, and language proficiency in the sidebar</p>
+                    </div>
+                </div>
+                
+                <div class="instruction-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Set Your Preferences</h4>
+                        <p>Choose countries, budget range, field of study, and program type</p>
+                    </div>
+                </div>
+                
+                <div class="instruction-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Get Personalized Matches</h4>
+                        <p>Our algorithm analyzes your profile and finds the best universities for you</p>
+                    </div>
+                </div>
+                
+                <div class="instruction-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Filter & Sort Results</h4>
+                        <p>Refine results by fees, country, or university type in the side-by-side card layout</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/form.js"></script>
+    <script>
+        // Load user name
+        async function loadUserName() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('userName').textContent = data.user.name;
+                }
+            } catch (error) {
+                console.error('Error loading user name:', error);
+            }
+        }
+        
+        // Update preference weights dynamically
+        function updateWeights() {
+            const academic = parseInt(document.getElementById('academicWeight').value);
+            const admission = parseInt(document.getElementById('admissionWeight').value);
+            const budget = parseInt(document.getElementById('budgetWeight').value);
+            const career = parseInt(document.getElementById('careerWeight').value);
+            const location = parseInt(document.getElementById('locationWeight').value);
+            
+            document.getElementById('academicValue').textContent = academic + '%';
+            document.getElementById('admissionValue').textContent = admission + '%';
+            document.getElementById('budgetValue').textContent = budget + '%';
+            document.getElementById('careerValue').textContent = career + '%';
+            document.getElementById('locationValue').textContent = location + '%';
+            
+            const total = academic + admission + budget + career + location;
+            document.getElementById('totalWeight').textContent = total;
+            
+            const warning = document.getElementById('weightWarning');
+            const submitBtn = document.getElementById('submitButton');
+            
+            if (total !== 100) {
+                warning.style.display = 'inline';
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.6';
+                submitBtn.style.cursor = 'not-allowed';
+            } else {
+                warning.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.cursor = 'pointer';
+            }
+        }
+        
+        loadUserName();
+    </script>
+    
+    <style>
+        .preferences-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 18px;
+            border-radius: 12px;
+            margin: 20px 0;
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .preference-slider {
+            display: grid;
+            grid-template-columns: 160px 1fr 50px;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 0;
+        }
+        
+        .preference-slider label {
+            font-weight: 500;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .preference-slider input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .preference-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .preference-slider input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .weight-value {
+            text-align: right;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        
+        .total-weight {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid rgba(255,255,255,0.3);
+            font-size: 16px;
+        }
+        
+        .help-text {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,14 @@
+Flask
+pandas
+numpy
+scikit-learn
+scipy>=1.9.0
+markupsafe
+Werkzeug
+beautifulsoup4
+requests
+lxml
+pymongo
+bcrypt
+Flask-Session
+reportlab>=4.0.0
