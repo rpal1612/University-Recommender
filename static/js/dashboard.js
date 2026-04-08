@@ -31,9 +31,7 @@ function switchTab(tabName) {
     currentTab = tabName;
 
     // Load data based on tab
-    if (tabName === 'history' && !document.querySelector('#historyContainer .history-item')) {
-        loadHistory();
-    } else if (tabName === 'wishlist') {
+    if (tabName === 'wishlist') {
         loadWishlist();
     }
 }
@@ -59,24 +57,24 @@ async function loadDashboard() {
         userData = await userResponse.json();
         displayUserInfo(userData);
 
-        // Load search history initially
-        await loadHistory();
-
     } catch (error) {
         console.error('Dashboard error:', error);
-        document.getElementById('historyContainer').innerHTML = `
-            <div class="empty-state">
-                <h4>Error loading dashboard</h4>
-                <p>${error.message}</p>
-            </div>
-        `;
+        alert('Error loading dashboard: ' + error.message);
     }
 }
 
-// Display user information and statistics
+    // Display user information and statistics
 function displayUserInfo(data) {
     const user = data.user;
     const stats = data.stats || {};
+
+    console.log('=== DASHBOARD DEBUG ===');
+    console.log('Full data received:', data);
+    console.log('Stats object:', stats);
+    console.log('Top countries:', stats.top_countries);
+    console.log('Best matches:', stats.best_matches);
+    console.log('Category distribution:', stats.category_distribution);
+    console.log('=====================');
 
     document.getElementById('userName').textContent = user.name;
     document.getElementById('userNameWelcome').textContent = user.name.split(' ')[0];
@@ -91,172 +89,76 @@ function displayUserInfo(data) {
         const daysDiff = Math.floor((today - memberDate) / (1000 * 60 * 60 * 24));
         document.getElementById('memberDays').textContent = daysDiff;
     }
+
+    // Add insights section
+    console.log('Adding dashboard insights with data:', data);
+    addDashboardInsights(data);
 }
 
-// Load search history
-async function loadHistory() {
-    try {
-        const historyResponse = await fetch('/api/history');
-        if (historyResponse.ok) {
-            const historyData = await historyResponse.json();
-            displayHistory(historyData.history);
-        } else {
-            displayHistory([]);
-        }
-    } catch (error) {
-        console.error('Error loading history:', error);
-        displayHistory([]);
-    }
-}
-
-// Display search history
-function displayHistory(history) {
-    const container = document.getElementById('historyContainer');
-
-    if (!history || history.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-history"></i>
-                <h4>No search history yet</h4>
-                <p>Your university searches will appear here</p>
-            </div>
-        `;
-        return;
-    }
-
-    let html = '';
-    history.forEach((entry, index) => {
-        const date = new Date(entry.timestamp);
-        const formattedDate = date.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        html += `
-            <div class="history-item" onclick="showSearchDetails(${index})">
-                <div class="history-header">
-                    <h4><i class="fas fa-search"></i> Search on ${formattedDate}</h4>
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-                <p><strong>Results:</strong> ${entry.recommendations ? entry.recommendations.length : 0} universities</p>
-                <p class="click-hint"><i class="fas fa-info-circle"></i> Click to view full details</p>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
+// Add dashboard insights with charts
+function addDashboardInsights(data) {
+    const statsGrid = document.getElementById('statsGrid');
     
-    // Store history data for modal access
-    window.searchHistoryData = history;
-}
-
-// Show search details in modal
-function showSearchDetails(index) {
-    const entry = window.searchHistoryData[index];
-    if (!entry) return;
-    
-    const date = new Date(entry.timestamp);
-    const formattedDate = date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-    
-    // Build preferences display
-    let preferencesHTML = '';
-    if (entry.preferences) {
-        const prefs = entry.preferences;
-        preferencesHTML = `
-            <div class="detail-section">
-                <h4><i class="fas fa-sliders-h"></i> Search Preferences</h4>
-                <div class="detail-grid">
-                    ${prefs.greV ? `<div class="detail-item"><strong>GRE Verbal:</strong> ${prefs.greV}</div>` : ''}
-                    ${prefs.greQ ? `<div class="detail-item"><strong>GRE Quantitative:</strong> ${prefs.greQ}</div>` : ''}
-                    ${prefs.greA ? `<div class="detail-item"><strong>GRE Analytical:</strong> ${prefs.greA}</div>` : ''}
-                    ${prefs.cgpa ? `<div class="detail-item"><strong>GPA:</strong> ${prefs.cgpa}</div>` : ''}
-                    ${prefs.ielts ? `<div class="detail-item"><strong>IELTS:</strong> ${prefs.ielts}</div>` : ''}
-                    ${prefs.toefl ? `<div class="detail-item"><strong>TOEFL:</strong> ${prefs.toefl}</div>` : ''}
-                    ${prefs.major ? `<div class="detail-item"><strong>Major:</strong> ${prefs.major}</div>` : ''}
-                    ${prefs.workExperience ? `<div class="detail-item"><strong>Work Experience:</strong> ${prefs.workExperience} years</div>` : ''}
-                    ${prefs.publications ? `<div class="detail-item"><strong>Publications:</strong> ${prefs.publications}</div>` : ''}
-                    ${prefs.countries ? `<div class="detail-item full-width"><strong>Countries:</strong> ${Array.isArray(prefs.countries) ? prefs.countries.join(', ') : prefs.countries}</div>` : ''}
-                    ${prefs.budget ? `<div class="detail-item"><strong>Budget:</strong> $${prefs.budget}</div>` : ''}
-                    ${prefs.universityType ? `<div class="detail-item"><strong>University Type:</strong> ${prefs.universityType}</div>` : ''}
-                    ${prefs.duration ? `<div class="detail-item"><strong>Duration:</strong> ${prefs.duration}</div>` : ''}
-                    ${prefs.researchFocused !== undefined ? `<div class="detail-item"><strong>Research Focused:</strong> ${prefs.researchFocused ? 'Yes' : 'No'}</div>` : ''}
-                    ${prefs.internshipOpportunities !== undefined ? `<div class="detail-item"><strong>Internship Opportunities:</strong> ${prefs.internshipOpportunities ? 'Yes' : 'No'}</div>` : ''}
-                    ${prefs.postStudyWorkVisa !== undefined ? `<div class="detail-item"><strong>Post-Study Work Visa:</strong> ${prefs.postStudyWorkVisa ? 'Yes' : 'No'}</div>` : ''}
-                </div>
-            </div>
-        `;
-    }
-    
-    // Build recommendations display
-    let recommendationsHTML = '';
-    if (entry.recommendations && entry.recommendations.length > 0) {
-        recommendationsHTML = `
-            <div class="detail-section">
-                <h4><i class="fas fa-university"></i> Recommended Universities (${entry.recommendations.length})</h4>
-                <div class="recommendations-list">
-                    ${entry.recommendations.map((uni, idx) => `
-                        <div class="recommendation-card">
-                            <div class="recommendation-header">
-                                <span class="recommendation-rank">#${idx + 1}</span>
-                                <h5>${uni.university_name || uni.name || 'Unknown University'}</h5>
-                            </div>
-                            <div class="recommendation-details">
-                                ${uni.country ? `<span><i class="fas fa-globe"></i> ${uni.country}</span>` : ''}
-                                ${uni.ranking && uni.ranking !== 999 ? `<span><i class="fas fa-trophy"></i> Rank #${uni.ranking}</span>` : ''}
-                                ${uni.match_score ? `<span class="match-score"><i class="fas fa-star"></i> ${(uni.match_score * 100).toFixed(1)}% Match</span>` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    // Create and show modal
-    const modalHTML = `
-        <div class="modal-overlay" onclick="closeSearchModal()">
-            <div class="modal-content" onclick="event.stopPropagation()">
-                <div class="modal-header">
-                    <h3><i class="fas fa-search"></i> Search Details</h3>
-                    <button class="modal-close" onclick="closeSearchModal()">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div class="search-date">
-                        <i class="fas fa-calendar"></i> ${formattedDate}
-                    </div>
-                    ${preferencesHTML}
-                    ${recommendationsHTML}
-                </div>
+    // Add insights section after stats grid (only Top Countries chart)
+    const insightsSection = document.createElement('div');
+    insightsSection.className = 'insights-section';
+    insightsSection.innerHTML = `
+        <h3><i class="fas fa-lightbulb"></i> Your Insights</h3>
+        <div class="insights-grid">
+            <div class="insight-card" style="grid-column: span 2;">
+                <h4><i class="fas fa-chart-line"></i> Top Countries You've Explored</h4>
+                <canvas id="countriesChart"></canvas>
             </div>
         </div>
     `;
     
-    // Add modal to page
-    const existingModal = document.getElementById('searchModal');
-    if (existingModal) {
-        existingModal.remove();
+    if (!document.querySelector('.insights-section')) {
+        statsGrid.parentNode.insertBefore(insightsSection, statsGrid.nextSibling);
+        
+        // Load charts after a short delay
+        setTimeout(() => {
+            loadDashboardCharts(data);
+        }, 100);
     }
-    
-    const modalDiv = document.createElement('div');
-    modalDiv.id = 'searchModal';
-    modalDiv.innerHTML = modalHTML;
-    document.body.appendChild(modalDiv);
 }
 
-// Close search modal
-function closeSearchModal() {
-    const modal = document.getElementById('searchModal');
-    if (modal) {
-        modal.remove();
+// Load dashboard charts
+function loadDashboardCharts(data) {
+    const stats = data.stats || {};
+    
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js not loaded');
+        return;
+    }
+    
+    // Countries chart
+    if (stats.top_countries && stats.top_countries.length > 0 && document.getElementById('countriesChart')) {
+        try {
+            const ctx = document.getElementById('countriesChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: stats.top_countries.map(c => c.country),
+                    datasets: [{
+                        data: stats.top_countries.map(c => c.count),
+                        backgroundColor: ['#667eea', '#4caf50', '#ff9800', '#2196f3', '#f44336']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error creating countries chart:', error);
+            document.getElementById('countriesChart').parentElement.innerHTML = '<p style="text-align: center; color: #666;">Perform searches to see country distribution</p>';
+        }
+    } else if (document.getElementById('countriesChart')) {
+        document.getElementById('countriesChart').parentElement.innerHTML = '<p style="text-align: center; color: #666; padding: 40px 20px;">Perform searches to see country distribution</p>';
     }
 }
 

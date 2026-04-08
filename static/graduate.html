@@ -170,7 +170,50 @@
                     </div>
                 </div>
                 
-                <button type="submit" class="submit-button">
+                <!-- Preference Weights Section -->
+                <div class="form-section-title">🎯 Customize Your Priorities</div>
+                <p class="help-text" style="margin: -10px 0 12px 0; font-size: 13px; color: #888;">
+                    Adjust what matters most (Total must = 100%)
+                </p>
+                
+                <div class="preferences-section">
+                    <div class="preference-slider">
+                        <label>🎓 Academic Prestige</label>
+                        <input type="range" name="academicWeight" id="academicWeight" min="0" max="60" value="35" oninput="updateWeights()">
+                        <span class="weight-value" id="academicValue">35%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>✅ Admission Chances</label>
+                        <input type="range" name="admissionWeight" id="admissionWeight" min="0" max="60" value="25" oninput="updateWeights()">
+                        <span class="weight-value" id="admissionValue">25%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>💰 Budget Fit</label>
+                        <input type="range" name="budgetWeight" id="budgetWeight" min="0" max="60" value="20" oninput="updateWeights()">
+                        <span class="weight-value" id="budgetValue">20%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>📈 Career Outcomes</label>
+                        <input type="range" name="careerWeight" id="careerWeight" min="0" max="60" value="10" oninput="updateWeights()">
+                        <span class="weight-value" id="careerValue">10%</span>
+                    </div>
+                    
+                    <div class="preference-slider">
+                        <label>🌍 Location Preference</label>
+                        <input type="range" name="locationWeight" id="locationWeight" min="0" max="60" value="10" oninput="updateWeights()">
+                        <span class="weight-value" id="locationValue">10%</span>
+                    </div>
+                    
+                    <div class="total-weight">
+                        <strong>Total: <span id="totalWeight">100</span>%</strong>
+                        <span id="weightWarning" style="color: #ff4444; display: none; margin-left: 10px;">⚠️ Must equal 100%</span>
+                    </div>
+                </div>
+                
+                <button type="submit" class="submit-button" id="submitButton">
                     <i class="fas fa-search"></i> Find Universities
                 </button>
                 
@@ -277,7 +320,118 @@
             }
         }
         
+        // Update preference weights dynamically
+        function updateWeights() {
+            const academic = parseInt(document.getElementById('academicWeight').value);
+            const admission = parseInt(document.getElementById('admissionWeight').value);
+            const budget = parseInt(document.getElementById('budgetWeight').value);
+            const career = parseInt(document.getElementById('careerWeight').value);
+            const location = parseInt(document.getElementById('locationWeight').value);
+            
+            document.getElementById('academicValue').textContent = academic + '%';
+            document.getElementById('admissionValue').textContent = admission + '%';
+            document.getElementById('budgetValue').textContent = budget + '%';
+            document.getElementById('careerValue').textContent = career + '%';
+            document.getElementById('locationValue').textContent = location + '%';
+            
+            const total = academic + admission + budget + career + location;
+            document.getElementById('totalWeight').textContent = total;
+            
+            const warning = document.getElementById('weightWarning');
+            const submitBtn = document.getElementById('submitButton');
+            
+            if (total !== 100) {
+                warning.style.display = 'inline';
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.6';
+                submitBtn.style.cursor = 'not-allowed';
+            } else {
+                warning.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.cursor = 'pointer';
+            }
+        }
+        
         loadUserName();
     </script>
+    
+    <style>
+        .preferences-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 18px;
+            border-radius: 12px;
+            margin: 20px 0;
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .preference-slider {
+            display: grid;
+            grid-template-columns: 160px 1fr 50px;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 0;
+        }
+        
+        .preference-slider label {
+            font-weight: 500;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .preference-slider input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .preference-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .preference-slider input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .weight-value {
+            text-align: right;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        
+        .total-weight {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid rgba(255,255,255,0.3);
+            font-size: 16px;
+        }
+        
+        .help-text {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
 </body>
 </html>

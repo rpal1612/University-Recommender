@@ -15,6 +15,7 @@ class Config:
     
     # Session
     SESSION_TYPE = 'filesystem'
+    SESSION_FILE_DIR = os.path.join(os.path.dirname(__file__), 'flask_session')
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY = True
