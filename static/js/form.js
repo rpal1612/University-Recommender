@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadFields();
     setupLanguageTestToggle();
     setupFormSubmission();
+    setupBudgetValidation();
 });
 
 // Load countries dynamically from backend
@@ -164,4 +165,61 @@ function toggleAllCountries() {
     });
     
     updateBudgetHint();
+}
+
+// Setup budget validation
+function setupBudgetValidation() {
+    const budgetMinInput = document.querySelector('input[name="budgetMin"]');
+    const budgetMaxInput = document.querySelector('input[name="budgetMax"]');
+    const form = document.querySelector('form');
+    
+    function validateBudget() {
+        const min = parseFloat(budgetMinInput.value) || 0;
+        const max = parseFloat(budgetMaxInput.value) || 0;
+        
+        // Remove any existing error messages
+        const existingError = document.getElementById('budgetError');
+        if (existingError) {
+            existingError.remove();
+        }
+        
+        // Validate: min must be less than max
+        if (min >= max) {
+            const errorDiv = document.createElement('div');
+            errorDiv.id = 'budgetError';
+            errorDiv.style.color = '#ff4444';
+            errorDiv.style.fontSize = '13px';
+            errorDiv.style.marginTop = '5px';
+            errorDiv.textContent = '❌ Minimum budget must be less than maximum budget';
+            budgetMaxInput.parentElement.appendChild(errorDiv);
+            return false;
+        }
+        
+        // Validate: both must be positive
+        if (min < 0 || max < 0) {
+            const errorDiv = document.createElement('div');
+            errorDiv.id = 'budgetError';
+            errorDiv.style.color = '#ff4444';
+            errorDiv.style.fontSize = '13px';
+            errorDiv.style.marginTop = '5px';
+            errorDiv.textContent = '❌ Budget values must be positive';
+            budgetMaxInput.parentElement.appendChild(errorDiv);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Real-time validation on input
+    budgetMinInput.addEventListener('input', validateBudget);
+    budgetMaxInput.addEventListener('input', validateBudget);
+    
+    // Validation on form submit
+    form.addEventListener('submit', function(e) {
+        if (!validateBudget()) {
+            e.preventDefault();
+            budgetMaxInput.focus();
+            return false;
+        }
+    });
 }

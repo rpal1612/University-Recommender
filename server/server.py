@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+import sys
+import os
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == "win32":
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 import random
 from flask import Flask, render_template, request, redirect, jsonify, session
 from flask_session import Session
@@ -18,6 +26,9 @@ from config import DevelopmentConfig
 from database import Database
 from auth import auth_bp, init_auth, login_required, admin_required
 from collaborative_filter import CollaborativeFilter
+from enhanced_scoring import EnhancedScorer
+from university_categorizer import UniversityCategorizer
+from recommendation_explainer import RecommendationExplainer
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='../static', template_folder='../static')
@@ -49,6 +60,12 @@ if db:
 
 # Initialize collaborative filtering
 collab_filter = CollaborativeFilter(db, weight=0.3) if db else None
+
+# Initialize enhanced scoring system
+enhanced_scorer = EnhancedScorer()
+university_categorizer = UniversityCategorizer()
+recommendation_explainer = RecommendationExplainer()
+print("✓ Enhanced scoring system initialized")
 
 # Load and prepare enhanced data once at startup for better performance
 print("Loading and preparing real university data...")
@@ -155,17 +172,56 @@ def get_user_data():
         history = db.get_user_history(user_id)
         wishlist = db.get_wishlist(user_id)
         
-        # Calculate unique universities
+        # Calculate unique universities and detailed stats
         unique_universities = set()
+        country_counts = {}
+        category_distribution = {'Safety': 0, 'Target': 0, 'Reach': 0, 'Long Shot': 0}
+        best_matches = []
+        all_recommendations = []
+        
         for entry in history:
-            if 'recommendations' in entry:
+            if 'recommendations' in entry and isinstance(entry['recommendations'], list):
                 for rec in entry['recommendations']:
-                    unique_universities.add(rec.get('university_name'))
+                    # Get university name
+                    uni_name = rec.get('name', rec.get('university_name', rec.get('univName', 'Unknown')))
+                    if uni_name and uni_name != 'Unknown':
+                        unique_universities.add(uni_name)
+                    
+                    # Count countries
+                    country = rec.get('country', 'Unknown')
+                    if country and country != 'Unknown':
+                        country_counts[country] = country_counts.get(country, 0) + 1
+                    
+                    # Count categories (handle old searches without category field)
+                    category = rec.get('category', 'Target')  # Default to Target if missing
+                    if category in category_distribution:
+                        category_distribution[category] += 1
+                    
+                    # Track all recommendations with scores
+                    score = rec.get('score', 0)
+                    if isinstance(score, (int, float)) and score > 0:
+                        all_recommendations.append({
+                            'name': uni_name,
+                            'score': float(score),
+                            'country': country,
+                            'category': category
+                        })
+        
+        # Get best matches (top 5 by score)
+        if all_recommendations:
+            best_matches = sorted(all_recommendations, key=lambda x: x['score'], reverse=True)[:5]
+        
+        # Sort and limit top countries
+        top_countries = [{'country': k, 'count': v} for k, v in 
+                        sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
         
         stats = {
             'total_searches': len(history),
             'unique_universities': len(unique_universities),
-            'wishlist_count': len(wishlist)
+            'wishlist_count': len(wishlist),
+            'top_countries': top_countries,
+            'category_distribution': category_distribution,
+            'best_matches': best_matches
         }
         
         # Remove sensitive data
@@ -182,6 +238,40 @@ def get_user_data():
         })
     except Exception as e:
         print(f"Error getting user data: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/debug/user-stats')
+@login_required
+def debug_user_stats():
+    """Debug endpoint to check user stats data"""
+    try:
+        user_id = session.get('user_id')
+        history = db.get_user_history(user_id)
+        
+        print("=== DEBUG USER STATS ===")
+        print(f"User ID: {user_id}")
+        print(f"Total history entries: {len(history)}")
+        
+        if history:
+            print(f"\nFirst entry structure:")
+            first_entry = history[0]
+            print(f"Keys: {first_entry.keys()}")
+            if 'recommendations' in first_entry:
+                print(f"Number of recommendations: {len(first_entry['recommendations'])}")
+                if first_entry['recommendations']:
+                    print(f"First recommendation keys: {first_entry['recommendations'][0].keys()}")
+                    print(f"First recommendation: {first_entry['recommendations'][0]}")
+        
+        return jsonify({
+            'total_entries': len(history),
+            'sample_entry': history[0] if history else None
+        })
+    except Exception as e:
+        print(f"Debug error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route("/main")
@@ -210,45 +300,6 @@ def get_fields():
         # Fallback
         return jsonify(['Computer Science,Engineering', 'Data Science,AI', 'Business,Management', 
                        'Engineering,Robotics', 'Mathematics,Statistics', 'Physics,Applied Sciences'])
-
-@app.route('/api/history')
-@login_required
-def get_history():
-    """Get user's search history"""
-    try:
-        if not db:
-            return jsonify({'error': 'Database not available'}), 503
-        
-        user_id = session.get('user_id')
-        history = db.get_user_history(user_id, limit=20)
-        
-        return jsonify({
-            'success': True,
-            'history': history,
-            'count': len(history)
-        }), 200
-    except Exception as e:
-        print(f"Error getting history: {e}")
-        return jsonify({'error': 'Failed to fetch history'}), 500
-
-@app.route('/api/history/<search_id>', methods=['DELETE'])
-@login_required
-def delete_history_item(search_id):
-    """Delete a specific search from history"""
-    try:
-        if not db:
-            return jsonify({'error': 'Database not available'}), 503
-        
-        user_id = session.get('user_id')
-        success = db.delete_search(user_id, search_id)
-        
-        if success:
-            return jsonify({'success': True, 'message': 'Search deleted'}), 200
-        else:
-            return jsonify({'error': 'Search not found'}), 404
-    except Exception as e:
-        print(f"Error deleting history: {e}")
-        return jsonify({'error': 'Failed to delete search'}), 500
 
 # ==================== WISHLIST API ROUTES ====================
 
@@ -318,23 +369,114 @@ def remove_from_wishlist(university_name):
         print(f"Error removing from wishlist: {e}")
         return jsonify({'error': 'Failed to remove from wishlist'}), 500
 
+@app.route('/api/export-pdf', methods=['POST'])
+@login_required
+def export_pdf():
+    """Export search results to PDF"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        from io import BytesIO
+        from flask import send_file
+        
+        pdf_data = request.json
+        buffer = BytesIO()
+        
+        # Create PDF
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72,
+                               topMargin=72, bottomMargin=18)
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], 
+                                     fontSize=24, textColor=colors.HexColor('#667eea'),
+                                     spaceAfter=30, alignment=1)
+        title = Paragraph("University Recommendations", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 12))
+        
+        # Summary
+        summary_text = f"Generated on: {pdf_data['generatedAt']}<br/>Total Matches: {pdf_data['total']}"
+        summary = Paragraph(summary_text, styles['Normal'])
+        elements.append(summary)
+        elements.append(Spacer(1, 20))
+        
+        # Table data
+        table_data = [['University', 'Country', 'Score', 'Admission', 'Category', 'Tuition']]
+        
+        for uni in pdf_data['universities']:
+            table_data.append([
+                uni['name'][:30] + '...' if len(uni['name']) > 30 else uni['name'],
+                uni['country'],
+                f"{uni['score']}%",
+                f"{uni['admission_probability']}%",
+                uni['category'],
+                uni['tuition'][:20] if len(uni['tuition']) > 20 else uni['tuition']
+            ])
+        
+        # Create table
+        table = Table(table_data, colWidths=[2.5*inch, 1*inch, 0.8*inch, 0.9*inch, 1*inch, 1.3*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        elements.append(table)
+        
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        return send_file(buffer, mimetype='application/pdf', 
+                        as_attachment=True, 
+                        download_name=f'university-recommendations-{datetime.now().strftime("%Y%m%d")}.pdf')
+    
+    except ImportError:
+        return jsonify({'error': 'PDF generation library not installed. Install reportlab: pip install reportlab'}), 500
+    except Exception as e:
+        print(f"PDF export error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 # ==================== ADMIN API ROUTES ====================
 
 @app.route('/api/admin/stats')
 @admin_required
 def get_admin_stats():
-    """Get system-wide statistics (admin only)"""
+    """Get system-wide statistics (admin only) - ALWAYS FRESH DATA"""
     try:
         if not db:
             return jsonify({'error': 'Database not available'}), 503
         
+        # Force fresh data retrieval from database (no caching)
         stats = db.get_system_statistics()
-        return jsonify({
+        
+        response = jsonify({
             'success': True,
             'stats': stats
-        }), 200
+        })
+        
+        # Prevent browser/proxy caching - always fetch fresh data
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response, 200
     except Exception as e:
         print(f"Error getting admin stats: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Failed to fetch statistics'}), 500
 
 @app.route('/api/admin/users')
@@ -358,26 +500,27 @@ def get_admin_users():
 @app.route('/api/admin/groups')
 @admin_required
 def get_admin_groups():
-    """Get collaborative filtering groups (admin only) - with caching"""
+    """Get user segmentation groups (admin only) - with 10-minute caching"""
     try:
         if not db:
             return jsonify({'error': 'Database not available'}), 503
         
-        # Check cache (30 minute expiry)
+        # Check cache (10 minute expiry for better responsiveness)
         now = datetime.now()
         if groups_cache['data'] is not None and groups_cache['timestamp'] is not None:
             cache_age = (now - groups_cache['timestamp']).total_seconds()
-            if cache_age < 1800:  # 30 minutes
+            if cache_age < 600:  # 10 minutes (reduced from 30 for better real-time updates)
                 print(f"Returning cached groups (age: {int(cache_age)}s)")
                 return jsonify({
                     'success': True,
                     'groups': groups_cache['data'],
                     'count': len(groups_cache['data']),
-                    'cached': True
+                    'cached': True,
+                    'cache_age_seconds': int(cache_age)
                 }), 200
         
-        # Calculate groups (this takes time)
-        print("Calculating collaborative groups (cache expired or empty)...")
+        # Calculate groups (filtered and deduplicated)
+        print("Calculating user segments (cache expired or empty)...")
         groups = db.get_user_collaborative_groups()
         
         # Update cache
@@ -388,220 +531,37 @@ def get_admin_groups():
             'success': True,
             'groups': groups,
             'count': len(groups),
-            'cached': False
+            'cached': False,
+            'cache_age_seconds': 0
         }), 200
     except Exception as e:
         print(f"Error getting groups: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Failed to fetch groups'}), 500
+        return jsonify({'error': 'Failed to fetch groups', 'details': str(e)}), 500
 
 
 def calculate_comprehensive_score(user_data, uni_row):
     """
-    OPTIMIZED scoring with feature engineering:
-    - Academic Match (30%) - Uses engineered academic_strength
-    - University Prestige (25%) - Ranking + research reputation
-    - Field Alignment (20%) - Program match
-    - Affordability (15%) - Cost vs budget
-    - Language Fit (5%) - IELTS/TOEFL match
-    - Preferences Alignment (5%) - Research/Internship/Visa
+    Enhanced comprehensive scoring using EnhancedScorer class
+    Returns: normalized score (0-1) and detailed breakdown
     """
-    score = 0
-    details = {}
-    
-    # Calculate user's academic strength using same formula as dataset
-    user_greV_norm = (user_data['greV'] - 130) / 40
-    user_greQ_norm = (user_data['greQ'] - 130) / 40
-    user_greA_norm = user_data['greA'] / 6.0
-    user_cgpa_norm = user_data['cgpa'] / 4.0
-    
-    user_academic_strength = (
-        user_greV_norm * 0.25 + 
-        user_greQ_norm * 0.35 +
-        user_greA_norm * 0.15 + 
-        user_cgpa_norm * 0.25
-    )
-    
-    # 1. Academic Match (30% weight) - How well user matches university requirements
-    # Calculate university's academic strength from existing data
-    uni_greV_norm = (uni_row.get('greV', 150) - 130) / 40
-    uni_greQ_norm = (uni_row.get('greQ', 150) - 130) / 40
-    uni_greA_norm = uni_row.get('greA', 4.0) / 6.0
-    uni_cgpa_norm = uni_row.get('cgpa', 3.0) / 4.0
-    
-    uni_academic_strength = (
-        uni_greV_norm * 0.25 + 
-        uni_greQ_norm * 0.35 +
-        uni_greA_norm * 0.15 + 
-        uni_cgpa_norm * 0.25
-    )
-    
-    # Score based on how close user is to university requirements
-    if user_academic_strength >= uni_academic_strength:
-        # User exceeds requirements - full score
-        academic_score = min(1.0, 0.95 + (user_academic_strength - uni_academic_strength) * 0.1)
+    # Create scorer with user's custom weights if provided
+    user_weights = user_data.get('preference_weights')
+    if user_weights:
+        scorer = EnhancedScorer(user_weights=user_weights)
+        final_score, breakdown = scorer.calculate_comprehensive_score(user_data, uni_row)
     else:
-        # Below requirements - penalty
-        academic_score = max(0, 1.0 - (uni_academic_strength - user_academic_strength) * 1.5)
+        # Use default global scorer
+        final_score, breakdown = enhanced_scorer.calculate_comprehensive_score(user_data, uni_row)
     
-    # Ensure score doesn't exceed 1.0
-    academic_score = min(1.0, academic_score)
-    score += academic_score * 0.30
-    details['academic_match'] = round(academic_score * 0.30, 3)
-    
-    # 2. University Prestige (25% weight) - Ranking + research reputation
-    # Calculate ranking score from actual ranking data
-    ranking = uni_row.get('ranking', 999)
-    if ranking <= 10:
-        prestige_score = 1.0
-    elif ranking <= 50:
-        prestige_score = 0.9
-    elif ranking <= 100:
-        prestige_score = 0.7
-    elif ranking <= 200:
-        prestige_score = 0.5
-    elif ranking <= 500:
-        prestige_score = 0.3
-    else:
-        prestige_score = 0.2
-    
-    # Small boost for research universities if user has publications (capped at 1.0)
-    publications = user_data.get('publications', 0)
-    if publications > 2 and uni_row.get('research_focused', False):
-        prestige_score = min(1.0, prestige_score + 0.05)
-    
-    # Small boost for work experience with professional programs (capped at 1.0)
-    work_exp = user_data.get('workExperience', 0)
-    if work_exp > 3 and uni_row.get('internship_opportunities', False):
-        prestige_score = min(1.0, prestige_score + 0.05)
-    
-    score += prestige_score * 0.25
-    details['university_prestige'] = round(prestige_score * 0.25, 3)
-    
-    # 3. Field Alignment (20% weight) - Program match
-    field_score = 0
-    if user_data.get('major'):
-        program_fields = str(uni_row.get('program_fields', '')).lower()
-        major_lower = user_data['major'].lower()
-        
-        # Exact match
-        if major_lower in program_fields:
-            field_score = 1.0
-        else:
-            # Check keyword matches
-            major_keywords = major_lower.split()
-            matches = sum(1 for keyword in major_keywords if len(keyword) > 2 and keyword in program_fields)
-            if matches > 0:
-                field_score = min(1.0, 0.6 + (matches / len(major_keywords)) * 0.4)
-            else:
-                # Minimal credit for related fields
-                field_score = 0.2
-    else:
-        field_score = 0.5
-    
-    score += field_score * 0.20
-    details['field_alignment'] = round(field_score * 0.20, 3)
-    
-    # 4. Affordability (15% weight) - Cost vs budget
-    affordability_score = 0
-    uni_fees = uni_row.get('tuition_usd', 0)
-    budget_max = user_data.get('budgetMax', 100000)
-    budget_min = user_data.get('budgetMin', 0)
-    
-    if uni_fees <= 0:
-        # No tuition data available
-        affordability_score = 0.5
-    elif uni_fees <= budget_max:
-        if uni_fees <= budget_min:
-            # Way below budget - possibly too cheap, slight penalty
-            affordability_score = 0.8
-        else:
-            # Within budget - calculate based on how close to budget range
-            budget_mid = (budget_min + budget_max) / 2
-            if uni_fees <= budget_mid:
-                # Lower half of budget - very affordable
-                affordability_score = 1.0
-            else:
-                # Upper half of budget - less affordable but still good
-                affordability_score = 0.8 - ((uni_fees - budget_mid) / (budget_max - budget_mid)) * 0.3
-    else:
-        # Over budget - penalty
-        overage = (uni_fees - budget_max) / budget_max
-        affordability_score = max(0, 0.5 - overage)
-    
-    score += affordability_score * 0.15
-    details['affordability'] = round(affordability_score * 0.15, 3)
-    
-    # 5. Language Fit (5% weight) - Reduced importance
-    language_score = 0
-    if user_data.get('ielts') and pd.notna(uni_row.get('ielts_min')):
-        if user_data['ielts'] >= uni_row['ielts_min']:
-            language_score = 1.0
-        else:
-            # Partial credit if close (within 0.5 points)
-            diff = uni_row['ielts_min'] - user_data['ielts']
-            language_score = max(0, 1 - (diff / 1.5))
-    elif user_data.get('toefl') and pd.notna(uni_row.get('toefl_min')):
-        if user_data['toefl'] >= uni_row['toefl_min']:
-            language_score = 1.0
-        else:
-            diff = uni_row['toefl_min'] - user_data['toefl']
-            language_score = max(0, 1 - (diff / 25))
-    else:
-        language_score = 0.7  # Neutral if no data
-    
-    score += language_score * 0.05
-    details['language_fit'] = round(language_score * 0.05, 3)
-    
-    # 6. Preferences Alignment (5% weight) - Research/Internship/Visa
-    preference_score = 0
-    pref_count = 0
-    
-    # Country match is in filtering, not scoring
-    
-    # Research focus
-    if user_data.get('researchFocus'):
-        if uni_row.get('research_focused', False):
-            preference_score += 1.0
-        pref_count += 1
-    
-    # Internship opportunities
-    if user_data.get('internshipOpportunities'):
-        if uni_row.get('internship_opportunities', False):
-            preference_score += 1.0
-        pref_count += 1
-    
-    # Work visa
-    if user_data.get('workVisa'):
-        if uni_row.get('post_study_work_visa', False):
-            preference_score += 1.0
-        pref_count += 1
-    
-    # Duration match
-    if user_data.get('duration') and user_data['duration'] != 'Any':
-        desired_duration = int(user_data['duration'])
-        if uni_row.get('duration_years') == desired_duration:
-            preference_score += 1.0
-        pref_count += 1
-    
-    if pref_count > 0:
-        preference_score = preference_score / pref_count
-    else:
-        preference_score = 0.5
-    
-    score += preference_score * 0.05
-    details['preferences'] = round(preference_score * 0.05, 3)
-    
-    # CRITICAL: Cap total score at 1.0 (100%) to prevent >100% matches
-    score = min(1.0, score)
-    
-    details['total'] = round(score, 3)
+    # Normalize to 0-1 range for consistency with existing code
+    normalized_score = final_score / 100.0
     
     # Add percentage for display (will always be 0-100%)
-    details['percentage'] = round(score * 100, 1)
+    breakdown['percentage'] = round(final_score, 1)
     
-    return score, details
+    return normalized_score, breakdown
 
 
 def get_best_universities(user_data, top_n=15):
@@ -701,10 +661,14 @@ def get_best_universities(user_data, top_n=15):
         uni_name = item['uni_name']
         country = item['country']
         
-        if uni_name not in seen_universities:
+        # Normalize university name for better deduplication
+        # Remove extra spaces, convert to lowercase for comparison
+        uni_name_normalized = ' '.join(uni_name.lower().split())
+        
+        if uni_name_normalized not in seen_universities:
             # Check if we should add this university for diversity
             if not user_data.get('preferred_countries') or country_counts.get(country, 0) < max_per_country:
-                seen_universities.add(uni_name)
+                seen_universities.add(uni_name_normalized)
                 top_universities.append(item['idx'])
                 country_counts[country] = country_counts.get(country, 0) + 1
                 
@@ -715,8 +679,9 @@ def get_best_universities(user_data, top_n=15):
     if len(top_universities) < top_n:
         for item in scores_list:
             uni_name = item['uni_name']
-            if uni_name not in seen_universities:
-                seen_universities.add(uni_name)
+            uni_name_normalized = ' '.join(uni_name.lower().split())
+            if uni_name_normalized not in seen_universities:
+                seen_universities.add(uni_name_normalized)
                 top_universities.append(item['idx'])
                 if len(top_universities) >= top_n:
                     break
@@ -728,7 +693,10 @@ def get_best_universities(user_data, top_n=15):
             count = country_counts.get(country, 0)
             print(f"  {country}: {count} universities")
     
-    return top_universities, filtered_data, scores_list[:top_n]
+    # Return only the scores for deduplicated universities
+    deduplicated_scores = [item for item in scores_list if item['idx'] in top_universities]
+    
+    return top_universities, filtered_data, deduplicated_scores
 
 
 @app.route('/graduatealgo', methods=['GET', 'POST'])
@@ -793,6 +761,13 @@ def graduatealgo():
         print(f"Boolean Prefs: Research:{researchFocus}, Internship:{internshipOpportunities}, Visa:{workVisa}")
         print(f"{'='*60}\\n")
         
+        # Get custom preference weights from form (if provided)
+        academicWeight = float(src_args.get('academicWeight', 30))
+        admissionWeight = float(src_args.get('admissionWeight', 25))
+        budgetWeight = float(src_args.get('budgetWeight', 20))
+        careerWeight = float(src_args.get('careerWeight', 15))
+        locationWeight = float(src_args.get('locationWeight', 10))
+        
         # Build user data dictionary
         user_data = {
             'greV': greV,
@@ -809,7 +784,14 @@ def graduatealgo():
             'duration': duration,
             'researchFocus': researchFocus,
             'internshipOpportunities': internshipOpportunities,
-            'workVisa': workVisa
+            'workVisa': workVisa,
+            'preference_weights': {
+                'academic_prestige': academicWeight,
+                'admission_chances': admissionWeight,
+                'affordability': budgetWeight,
+                'career_outcomes': careerWeight,
+                'location_preference': locationWeight
+            }
         }
         
         if ielts:
@@ -845,6 +827,32 @@ def graduatealgo():
             toefl_val = uni_row.get('toefl_min')
             toefl_int = int(toefl_val) if pd.notna(toefl_val) else None
             
+            # Get admission probability and category from breakdown
+            # The breakdown has nested structure: {'admission_probability': {'score': 68.0, ...}}
+            breakdown = score_item['details']
+            if isinstance(breakdown.get('admission_probability'), dict):
+                admission_prob = breakdown['admission_probability'].get('score', 50.0)
+            else:
+                admission_prob = breakdown.get('admission_probability', 0.5) * 100
+            
+            category = university_categorizer.get_category(admission_prob / 100)
+            
+            # Prepare simplified breakdown for explanation (convert to 0-1 scale)
+            simple_breakdown = {
+                'academic_fit': breakdown.get('academic_fit', {}).get('score', 50) / 100 if isinstance(breakdown.get('academic_fit'), dict) else breakdown.get('academic_fit', 0.5),
+                'admission_probability': admission_prob / 100,
+                'financial_fit': breakdown.get('financial_fit', {}).get('score', 50) / 100 if isinstance(breakdown.get('financial_fit'), dict) else breakdown.get('financial_fit', 0.5),
+                'career_outcomes': breakdown.get('career_outcomes', {}).get('score', 50) / 100 if isinstance(breakdown.get('career_outcomes'), dict) else breakdown.get('career_outcomes', 0.5),
+                'personal_fit': breakdown.get('personal_fit', {}).get('score', 50) / 100 if isinstance(breakdown.get('personal_fit'), dict) else breakdown.get('personal_fit', 0.5)
+            }
+            
+            # Generate explanation
+            explanation = recommendation_explainer.generate_explanation(
+                uni_row['univName'],
+                simple_breakdown,
+                category
+            )
+            
             uni_details.append({
                 'name': str(uni_row['univName']),
                 'country': str(uni_row.get('country', 'N/A')),
@@ -857,6 +865,9 @@ def graduatealgo():
                 'toefl': toefl_int if toefl_int else 'N/A',
                 'score': float(score_item['score']),
                 'score_breakdown': score_item['details'],
+                'admission_probability': round(admission_prob, 1),
+                'category': category,
+                'explanation': explanation,
                 'research_focused': bool(uni_row.get('research_focused', False)),
                 'internship_opportunities': bool(uni_row.get('internship_opportunities', False)),
                 'post_study_work_visa': bool(uni_row.get('post_study_work_visa', False)),
@@ -904,12 +915,13 @@ def graduatealgo():
                     'workVisa': workVisa
                 }
                 
-                # Simplify recommendations for storage
+                # Simplify recommendations for storage (include category for dashboard stats)
                 recommendations = [{
-                    'name': uni['name'],
-                    'country': uni['country'],
-                    'score': uni.get('hybrid_score', uni['score']),
-                    'ranking': uni['ranking']
+                    'university_name': uni.get('name', 'Unknown'),
+                    'country': uni.get('country', 'Unknown'),
+                    'match_score': float(uni.get('hybrid_score', uni.get('score', uni.get('final_score', 0)))),
+                    'ranking': uni.get('ranking', 999),
+                    'category': uni.get('category', 'Target')  # Include category for stats
                 } for uni in uni_details]
                 
                 search_id = db.save_search(session['user_id'], search_data, recommendations)
@@ -964,6 +976,9 @@ def generate_results_html(uni_details, user_data):
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/results.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Top Navigation -->
@@ -973,6 +988,7 @@ def generate_results_html(uni_details, user_data):
             University Recommender
         </div>
         <div>
+            <a href="/dashboard" class="nav-btn"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
             <a href="/graduate" class="nav-btn"><i class="fas fa-search"></i> New Search</a>
             <a href="/" class="nav-btn"><i class="fas fa-home"></i> Home</a>
         </div>
@@ -1058,9 +1074,33 @@ def generate_results_html(uni_details, user_data):
                 </select>
             </div>
             
+            <!-- Filter by Category -->
+            <div class="filter-group">
+                <div class="filter-label">
+                    <i class="fas fa-bullseye"></i> Match Category
+                </div>
+                <select id="filterCategory" onchange="applyFilters()">
+                    <option value="">All Categories</option>
+                    <option value="Safety">🟢 Safety</option>
+                    <option value="Target">🔵 Target</option>
+                    <option value="Reach">🟠 Reach</option>
+                    <option value="Long Shot">🔴 Long Shot</option>
+                </select>
+            </div>
+            
             <button class="reset-btn" onclick="resetFilters()">
                 <i class="fas fa-redo"></i> Reset All Filters
             </button>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="action-btn" onclick="exportToPDF()">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </button>
+                <button class="action-btn" onclick="showScoreChart()">
+                    <i class="fas fa-chart-bar"></i> View Charts
+                </button>
+            </div>
         </div>
 
         <!-- Content Area -->
@@ -1774,4 +1814,4 @@ def generate_results_html(uni_details, user_data):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)  # Disabled debug to prevent auto-reload issues
